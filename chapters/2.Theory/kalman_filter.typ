@@ -447,67 +447,191 @@ g-h 滤波器的一次完整迭代包括：
 
 需要注意的是，g-h 滤波器的最大局限在于*需要手动调参*。不同系统、不同噪声水平需要不同的 $g$ 和 $h$，这往往需要大量试错。
 
-==== 矩阵形式：统一的数学框架
+==== 从标量到矩阵：为高维系统做准备
 
-前面的标量公式虽然直观，但当系统维度增加时会变得繁琐。现在将其改写为矩阵形式，这不仅更简洁，也为后续的卡尔曼滤波做好准备。
+前面通过标量公式完整描述了 g-h 滤波器的工作原理。但在实际应用中，往往需要处理更复杂的系统：
 
-#{
-  set par(first-line-indent: 0pt)
-  [*状态与预测的矩阵表示*]
-}
+*考虑以下场景的状态数量：*
+- *一维运动*：$(p, v)$ — 2个状态
+- *二维平面运动*：$(x, y, v_x, v_y)$ — 4个状态  
+- *三维空间运动*：$(x, y, z, v_x, v_y, v_z)$ — 6个状态
+- *加入加速度*：$(x, y, z, v_x, v_y, v_z, a_x, a_y, a_z)$ — 9个状态
 
-回顾上一章定义的状态向量和转移矩阵：
-$ bold(x)_k = vec(p_k, v_k), quad bold(F) = mat(1, Delta t; 0, 1) $
+如果继续用标量公式，二维系统就需要写4个方程，三维系统需要6个方程。更糟糕的是，这些方程的*结构完全相同*，只是作用在不同的变量上。
 
-预测步骤可以简洁地写为：
-$ bold(x)_(p r e d) = bold(F) hat(bold(x))_(k-1) $
+矩阵形式提供了统一的框架：*无论系统有多少个状态，公式形式都保持不变*。
 
-#{
-  set par(first-line-indent: 0pt)
-  [*增益矩阵：打包 $g$ 和 $h$*]
-}
+===== 第一步：将标量组织成向量
 
-将两个增益系数 $g$ 和 $h/Delta t$ 组织成*增益向量*：
-$ bold(K)_("g-h") = vec(g, h / (Delta t)) $
+回顾我们的两个修正公式：
 
-#{
-  set par(first-line-indent: 0pt)
-  [*观测矩阵：提取可测量的分量*]
-}
+$ hat(p)_k &= p_(p r e d) + g dot (z_k - p_(p r e d)) \
+  hat(v)_k &= v_(p r e d) + h / (Delta t) dot (z_k - p_(p r e d)) $
 
-GPS 只能测量位置，无法直接测量速度。因此需要一个*观测矩阵* $bold(H)$ 从状态向量中提取出位置分量：
+观察它们的共同结构：
+#align(center)[
+  估计 = 预测 + 增益 × 残差
+]
+
+两个公式的唯一区别是*增益系数不同*（$g$ vs $h/Delta t$）。既然结构相同，可以将它们"打包"成向量形式：
+
+$ vec(hat(p)_k, hat(v)_k) = vec(p_(p r e d), v_(p r e d)) + vec(g, h / (Delta t)) dot (z_k - p_(p r e d)) $
+
+定义：
+
+- *状态向量*：$bold(x)_k = mat(p_k, v_k)$
+
+- *增益向量*：$bold(K) = mat(g, h / (Delta t))$
+
+则上式可以简写为：
+
+$ hat(bold(x))_k = bold(x)_(p r e d) + bold(K) dot (z_k - p_(p r e d)) $
+
+#block(
+  fill: rgb("#e8f4f8"),
+  inset: 10pt,
+  radius: 4pt,
+  width: 100%,
+)[
+  *关键观察*：增益向量 $bold(K)$ 的每一行对应一个状态的修正规则。
+  - 第一行 $g$：控制位置如何修正
+  - 第二行 $h/Delta t$：控制速度如何修正
+]
+
+===== 第二步：处理"测量只有部分状态"的情况
+
+现在遇到一个问题：残差计算中的 $p_(p r e d)$ 如何从状态向量 $bold(x)_(p r e d) = vec(p_(p r e d), v_(p r e d))$ 中提取？
+
+问题的本质是：*GPS 只能测量位置，无法测量速度*。用数学语言说：
+- 状态空间维度：2（位置 + 速度）
+- 测量空间维度：1（仅位置）
+
+需要一个映射，将状态空间投影到测量空间。这就是*观测矩阵（Observation Matrix）* $bold(H)$ 的作用。
+
+对于"只测量位置"的情况：
+
 $ bold(H) = mat(1, 0) $
 
-这样，预测位置可以表示为：
-$ bold(H) bold(x)_(p r e d) = mat(1, 0) vec(p_(p r e d), v_(p r e d)) = p_(p r e d) $
+它的作用是：
 
-#{
+$ bold(H) bold(x)_(p r e d) = mat(1, 0) vec(p_(p r e d), v_(p r e d)) = 1 dot p_(p r e d) + 0 dot v_(p r e d) = p_(p r e d) $
+
+*直观理解*：$bold(H)$ 就像一个"提取器"，从完整状态中提取出可测量的部分。
+
+#block(
+  fill: rgb("#f0f8ff"),
+  inset: 10pt,
+  radius: 4pt,
+  width: 100%,
+)[
+  #{
   set par(first-line-indent: 0pt)
-  [*统一的更新公式*]
+  [*为什么需要 $bold(H)$？*]
 }
+  
+  
+  对于更复杂的系统，观测矩阵变得必不可少：
+  - *雷达测距*：只测量距离，不测量速度 → $bold(H) = mat(1, 0)$
+  - *加速度计*：只测量加速度，不测量位置和速度 → $bold(H) = mat(0, 0, 1)$
+  - *GPS+速度计*：同时测量位置和速度 → $bold(H) = mat(1, 0; 0, 1)$
+]
 
-有了这些定义，g-h 滤波器的修正步骤可以写成统一的矩阵形式：
+===== 第三步：完整的矩阵形式
 
-$ hat(bold(x))_k = bold(x)_(p r e d) + bold(K) (z_k - bold(H) bold(x)_(p r e d)) $
+有了状态向量 $bold(x)$、增益向量 $bold(K)$ 和观测矩阵 $bold(H)$，可以将 g-h 滤波器写成完全统一的形式：
 
-展开验证，看它是否还原了标量公式：
+#align(center)[
+  #block(
+    fill: rgb("#fff4e6"),
+    inset: 12pt,
+    radius: 4pt,
+    stroke: 1.5pt + rgb("#ff9800")
+  )[
+    $ hat(bold(x))_k = bold(x)_(p r e d) + bold(K) (z_k - bold(H) bold(x)_(p r e d)) $
+  ]
+]
 
-$ vec(hat(p)_k, hat(v)_k) &= vec(p_(p r e d), v_(p r e d)) + vec(g, h / (Delta t)) (z_k - p_(p r e d)) \
+*公式各部分的物理意义*：
+
+#table(
+  columns: (auto, 1fr),
+  align: (center, left),
+  inset: (8pt), 
+  stroke:none,
+  
+  // --- 表格内容 ---
+  
+  [$bold(x)_(p r e d)$],
+  [模型预测的状态。],
+
+  [$bold(H) bold(x)_(p r e d)$],
+  [预测状态对应的测量值（"如果状态是 $bold(x)_(p r e d)$，传感器应该读到什么"）。],
+
+  [$z_k - bold(H) bold(x)_(p r e d)$],
+  [测量残差（实际测量 $z_k$ vs 预期测量 $bold(H) bold(x)_(p r e d)$）。],
+
+  [$bold(K)$],
+  [决定多大程度上信任测量残差（即多大程度上校正预测值）。],
+
+  [$hat(bold(x))_k$],
+  [融合预测与测量后的最优状态估计。],
+)
+
+
+===== 验证：展开矩阵公式
+
+为确保矩阵形式确实等价于标量公式，展开验证：
+
+$ vec(hat(p)_k, hat(v)_k) &= vec(p_(p r e d), v_(p r e d)) + vec(g, h / (Delta t)) (z_k - mat(1, 0) vec(p_(p r e d), v_(p r e d))) \
+&= vec(p_(p r e d), v_(p r e d)) + vec(g, h / (Delta t)) (z_k - p_(p r e d)) \
 &= vec(p_(p r e d) + g(z_k - p_(p r e d)), v_(p r e d) + h / (Delta t)(z_k - p_(p r e d))) $
 
-结果与标量公式完全一致。
+结果与标量公式完全一致！
 
-这个统一的框架揭示了几个重要事实：
-1. $bold(K)$ 的物理意义清晰：第一行控制位置修正，第二行控制速度修正
-2. 为卡尔曼滤波铺平道路：g-h 滤波器的 $bold(K)$ 是*常数*；卡尔曼滤波只是增加了一步——*自动计算最优的 $bold(K)$*
+
+===== 预测步骤的矩阵形式
+
+为了完整性，预测步骤也可以用矩阵表示。回顾上一章定义的状态转移矩阵：
+
+$ bold(F) = mat(1, Delta t; 0, 1) $
+
+预测步骤写为：
+
+$ bold(x)_(p r e d) = bold(F) hat(bold(x))_(k-1) $
+
+展开验证：
+
+$ vec(p_(p r e d), v_(p r e d)) = mat(1, Delta t; 0, 1) vec(hat(p)_(k-1), hat(v)_(k-1)) = vec(hat(p)_(k-1) + Delta t dot hat(v)_(k-1), hat(v)_(k-1)) $
+
+正是我们的位置和速度预测公式！
+
+==== 完整算法流程（矩阵形式）
+
+#block(
+  fill: rgb("#fff8e1"),
+  inset: 12pt,
+  radius: 4pt,
+  stroke: 1pt + rgb("#ffa726")
+)[
+  *g-h 滤波器算法（矩阵形式）*
+  
+  *定义*：
+  
+  $ bold(x)_k = vec(p_k, v_k), quad bold(F) = mat(1, Delta t; 0, 1), quad bold(H) = mat(1, 0), quad bold(K) = vec(g, h / (Delta t)) $
+  
+  *输入*：上一时刻估计 $hat(bold(x))_(k-1)$，当前测量 $z_k$
+  
+  *步骤 1：预测*
+  $ bold(x)_(p r e d) = bold(F) hat(bold(x))_(k-1) $
+
+  *步骤 2：修正*
+  $ hat(bold(x))_k = bold(x)_(p r e d) + bold(K) (z_k - bold(H) bold(x)_(p r e d)) $
+  
+  *输出*：当前时刻最优估计 $hat(bold(x))_k$
+]
+
 
 ==== g-h 滤波器的局限性
-
-虽然 g-h 滤波器简单直观，但存在以下根本性缺陷：
-
-- *参数需要手动调节*：无法确定当前的 $g$ 和 $h$ 是否为最优
-- *固定增益无法适应变化*：当系统动态特性改变时（例如赛车进入弯道），固定参数会失效
-- *缺乏误差量化*：滤波器无法反馈"当前估计的可信度有多高"
 
 g-h 滤波器已经具备了现代滤波器的基本结构：
 $ "估计" = "预测" + "增益" times "残差" $
