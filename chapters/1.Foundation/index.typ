@@ -6,6 +6,8 @@
 #include"cpp_syntax.typ"
 == 软件工程基础
 
+#include"software_engineering.typ"
+
 == ROS/ROS2
 #blockquote[
   Euler's identity is $e^(pi i) + 1 = 0$. Do you really believe that they charged an armed enemy, or treated their children, their own flesh and blood, so cruelly, without a thought for their own interest or advantage? Such is Schrödinger's equation in
