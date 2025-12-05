@@ -1,6 +1,11 @@
 #import "/template/template.typ": *
-我们在基础篇
-== 计算机系统
+本书主要针对的我们在基础篇
+== 初识Linux
+#include"introduction_to_linux.typ"
+== 环境准备
+#include"install_ubuntu.typ"
+== Linux & Ubuntu 操作
+#include"ubuntu_guide.typ"
 
 == C++基本语法
 #include"cpp_syntax.typ"
