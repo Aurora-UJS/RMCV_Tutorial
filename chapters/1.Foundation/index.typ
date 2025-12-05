@@ -7,8 +7,12 @@
 == Linux & Ubuntu 操作
 #include"ubuntu_guide.typ"
 
-== C++基本语法
+== C++ 语言基础
 #include"cpp_syntax.typ"
+
+
+
+== CMake结构
 == 软件工程基础
 
 #include"software_engineering.typ"
