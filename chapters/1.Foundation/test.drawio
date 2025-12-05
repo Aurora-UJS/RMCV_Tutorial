@@ -1,0 +1,63 @@
+<mxfile host="app.diagrams.net" modified="2025-12-05T09:49:00.000Z" agent="Mozilla/5.0" etag="g2r9E4t3wXa7pS5y0Z1Q" version="24.4.16">
+  <diagram id="u98kG5Vf-Z-sR6tXwXyP" name="Page-1">
+    <mxGraphModel dx="1295" dy="751" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <mxCell id="2" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;font face=&quot;Consolas&quot;&gt;&lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;while&lt;/font&gt;&lt;/b&gt; (testExpression) {&lt;br&gt; &lt;font color=&quot;#B3B3B3&quot;&gt;// codes&lt;/font&gt;&lt;br&gt; &lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;if&lt;/font&gt;&lt;/b&gt; (condition to break) {&lt;br&gt;  &lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;break&lt;/font&gt;&lt;/b&gt;;&lt;br&gt; &lt;/font&gt;}&lt;br&gt; &lt;font face=&quot;Consolas&quot;&gt;&lt;font color=&quot;#B3B3B3&quot;&gt;// codes&lt;/font&gt;&lt;/font&gt;&lt;br&gt;}&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="20" y="20" width="220" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="" style="endArrow=block;html=1;elbow=vertical;strokeColor=#1AA5C5;strokeWidth=2;curved=0;exitX=0;exitY=0.58;exitPerimeter=0;" edge="1" parent="1" source="2">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="11" y="99" as="sourcePoint" />
+            <mxPoint x="111" y="198" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="11" y="99" />
+              <mxPoint x="11" y="198" />
+              <mxPoint x="111" y="198" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="4" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;font face=&quot;Consolas&quot;&gt;&lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;do&lt;/font&gt;&lt;/b&gt; {&lt;br&gt; &lt;font color=&quot;#B3B3B3&quot;&gt;// codes&lt;/font&gt;&lt;br&gt; &lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;if&lt;/font&gt;&lt;/b&gt; (condition to break) {&lt;br&gt;  &lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;break&lt;/font&gt;&lt;/b&gt;;&lt;br&gt; &lt;/font&gt;}&lt;br&gt; &lt;font face=&quot;Consolas&quot;&gt;&lt;font color=&quot;#B3B3B3&quot;&gt;// codes&lt;/font&gt;&lt;/font&gt;&lt;br&gt;}&lt;br&gt;&lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;while&lt;/font&gt;&lt;/b&gt; (testExpression);&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="220" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="" style="endArrow=block;html=1;elbow=vertical;strokeColor=#1AA5C5;strokeWidth=2;curved=0;exitX=0;exitY=0.47;exitPerimeter=0;" edge="1" parent="1" source="4">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="291" y="107" as="sourcePoint" />
+            <mxPoint x="391" y="218" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="291" y="107" />
+              <mxPoint x="291" y="218" />
+              <mxPoint x="391" y="218" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="6" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;font face=&quot;Consolas&quot;&gt;&lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;for&lt;/font&gt;&lt;/b&gt; (init; testExpression; update) {&lt;br&gt; &lt;font color=&quot;#B3B3B3&quot;&gt;// codes&lt;/font&gt;&lt;br&gt; &lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;if&lt;/font&gt;&lt;/b&gt; (condition to break) {&lt;br&gt;  &lt;b&gt;&lt;font color=&quot;#4C8EC5&quot;&gt;break&lt;/font&gt;&lt;/b&gt;;&lt;br&gt; &lt;/font&gt;}&lt;br&gt; &lt;font face=&quot;Consolas&quot;&gt;&lt;font color=&quot;#B3B3B3&quot;&gt;// codes&lt;/font&gt;&lt;/font&gt;&lt;br&gt;}&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="100" y="250" width="300" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="" style="endArrow=block;html=1;elbow=vertical;strokeColor=#1AA5C5;strokeWidth=2;curved=0;exitX=0;exitY=0.58;exitPerimeter=0;" edge="1" parent="1" source="6">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="91" y="339" as="sourcePoint" />
+            <mxPoint x="191" y="428" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="91" y="339" />
+              <mxPoint x="91" y="428" />
+              <mxPoint x="191" y="428" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="8" value="" style="line;strokeWidth=1;html=1;strokeColor=#C0C0C0;" vertex="1" parent="1">
+          <mxGeometry x="280" y="20" width="10" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="" style="line;strokeWidth=1;html=1;strokeColor=#C0C0C0;" vertex="1" parent="1">
+          <mxGeometry x="10" y="215" width="550" height="10" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
