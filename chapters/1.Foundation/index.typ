@@ -1,21 +1,34 @@
 #import "/template/template.typ": *
-本书主要针对的我们在基础篇
-== 初识Linux
-#include"introduction_to_linux.typ"
+
+本书主要针对基础篇的内容。
+
+== 初识 Linux
+#include "introduction_to_linux.typ"
+
 == 环境准备
-#include"install_ubuntu.typ"
+#include "install_ubuntu.typ"
+
 == Linux & Ubuntu 操作
-#include"ubuntu_guide.typ"
+#include "ubuntu_guide.typ"
+
+== 计算机系统基础
+// 新增：操作系统、进程、内存等基本概念
+// 为后续 C++ 和软件工程打基础
+#include "computer_system_basics.typ"
 
 == C++ 语言基础
-#include"cpp_syntax.typ"
+#include "cpp_syntax.typ"
 
+== CMake 与构建系统
+// "CMake结构" 改为更准确的名称
+#include "cmake_guide.typ"
 
-
-== CMake结构
 == 软件工程基础
+#include "software_engineering.typ"
 
-#include"software_engineering.typ"
+== Git 版本控制
+// 建议单独成章，RoboMaster 团队协作必备
+#include "git_guide.typ"
 
 == ROS/ROS2
 #blockquote[
