@@ -110,7 +110,7 @@
 
   // Set raw text font.
   // Default is Fira Mono at 8.8pt
-  show raw: set text(font: "Fira Mono")
+  show raw: set text(font: ("Fira Mono","LXGW WenKai"))
 
   // Configure page size and margins.
   set page(paper: paper-size, margin: (bottom: 1.75cm, top: 2.25cm))
