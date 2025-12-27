@@ -1,3 +1,601 @@
+== 软件工程基础
+
+=== 为什么需要软件工程
+// 引言：从"能跑"到"能维护"
+// - 个人项目 vs 团队项目的差异
+// - 代码的生命周期：编写只是开始
+// - 技术债务的概念
+// - RoboMaster 赛季迭代的教训
+// - 本章内容概览
+
+=== 代码规范与风格
+// 让代码成为团队的共同语言
+// - 为什么需要统一的代码规范
+// - Google C++ Style Guide 核心要点：
+//   命名规范（变量、函数、类、常量、文件）
+//   格式规范（缩进、空格、换行、大括号）
+//   注释规范（文件头、函数注释、行内注释）
+//   头文件规范（#pragma once、include 顺序）
+// - 现代 C++ 的额外建议
+// - 工具辅助：clang-format、clang-tidy
+// - .clang-format 配置示例
+// - 代码审查（Code Review）的价值
+// - RoboMaster 团队代码规范建议
+// === 代码规范与风格
+
+打开一个陌生的代码库，你最先注意到的是什么？不是算法的精妙，也不是架构的优雅，而是代码的"样子"——变量是怎么命名的、缩进用的是空格还是制表符、大括号放在行尾还是另起一行、注释写了什么。这些看似琐碎的细节，构成了代码的第一印象，也在很大程度上决定了你理解这段代码的难易程度。代码规范就是关于这些细节的约定，它让代码成为团队的共同语言。
+
+==== 为什么需要统一的代码规范
+
+每个程序员都有自己的编码习惯。有人喜欢用 `camelCase` 命名变量，有人偏爱 `snake_case`；有人习惯在运算符两边加空格，有人觉得紧凑一些更好；有人写详尽的注释，有人信奉"好代码不需要注释"。当一个人独自开发时，这些差异无关紧要。但当多人协作时，如果每个人都按照自己的风格编写代码，代码库很快就会变成一锅大杂烩。
+
+想象一下这样的场景：你打开一个文件，前半部分变量名是 `imageWidth`，后半部分变成了 `image_height`；有的函数用四个空格缩进，有的用制表符；有的大括号跟在函数声明后面，有的另起一行。这种风格的不一致会给阅读者带来额外的认知负担——你的大脑需要不断地适应不同的风格，而不能专注于理解代码的逻辑。更糟糕的是，当你需要修改这样的代码时，你不知道应该遵循哪种风格，于是又增加了一种新的风格，混乱进一步加剧。
+
+统一的代码规范解决的正是这个问题。当团队所有成员遵循相同的规范时，代码库呈现出一致的外观，仿佛出自同一人之手。新成员加入时，只需要学习一套规范，就能阅读和编写符合团队标准的代码。代码审查时，审查者可以专注于逻辑和设计，而不是争论风格问题。版本控制中的差异也会更加清晰——如果没有规范，一次简单的修改可能因为格式调整而产生大量无关的改动，淹没真正的变化。
+
+选择哪种规范并不是最重要的，重要的是团队有一个规范并且严格遵守。业界已经有许多成熟的代码规范可供参考，其中 Google C++ Style Guide 是最广泛使用的 C++ 规范之一。它不仅规定了格式和命名，还包含了许多关于 C++ 语言使用的建议，是学习现代 C++ 最佳实践的好材料。接下来，我们以 Google C++ Style Guide 为基础，介绍 C++ 代码规范的核心要点。
+
+==== 命名规范
+
+命名是编程中最重要也最困难的事情之一。好的命名能让代码自解释，读者一眼就能明白变量的含义、函数的功能；糟糕的命名则让代码变成谜语，需要仔细阅读实现才能理解意图。
+
+Google C++ Style Guide 对不同类型的标识符规定了不同的命名风格，这种差异化的命名让读者能够从名字本身判断标识符的类型。
+
+文件名使用小写字母，单词之间用下划线连接。头文件使用 `.h` 扩展名，源文件使用 `.cpp` 扩展名。文件名应该反映其内容，通常与其中定义的主要类同名。例如，定义 `ImageProcessor` 类的文件应该命名为 `image_processor.h` 和 `image_processor.cpp`。
+
+```cpp
+// 文件命名示例
+image_processor.h      // 头文件
+image_processor.cpp    // 源文件
+robot_controller.h
+camera_driver.cpp
+```
+
+类型名称使用大驼峰命名法（PascalCase），即每个单词首字母大写，不使用下划线。这包括类、结构体、类型别名、枚举类型和模板参数。这种命名风格让类型名称一眼就能与变量名区分开来。
+
+```cpp
+// 类型命名示例
+class ImageProcessor;
+struct SensorData;
+enum class RobotState;
+using TargetList = std::vector<Target>;
+
+template <typename DataType>  // 模板参数也用大驼峰
+class CircularBuffer;
+```
+
+变量名使用小写字母加下划线（snake_case）。这包括局部变量、函数参数和公有成员变量。对于类的私有和保护成员变量，在名称末尾加一个下划线，以便与局部变量区分。这个小小的约定非常有用——当你看到 `image_width_` 时，立即知道它是成员变量而非局部变量。
+
+```cpp
+// 变量命名示例
+int image_width;              // 局部变量
+double detection_threshold;   // 函数参数
+
+class Camera {
+public:
+    int frame_count;          // 公有成员（如果有的话）
+    
+private:
+    int image_width_;         // 私有成员，末尾加下划线
+    double exposure_time_;
+    std::string device_path_;
+};
+```
+
+函数名使用大驼峰命名法，与类型名相同。函数名应该是动词或动词短语，描述函数执行的动作。访问器（getter）和修改器（setter）可以使用与变量类似的命名，如 `image_width()` 和 `set_image_width()`。
+
+```cpp
+// 函数命名示例
+void ProcessImage();
+bool DetectTarget();
+int CalculateDistance();
+
+// 访问器和修改器
+int image_width() const { return image_width_; }
+void set_image_width(int width) { image_width_ = width; }
+```
+
+常量和枚举值使用 `k` 前缀加大驼峰命名。这种命名让常量一眼就能被识别出来，避免与变量混淆。宏定义则使用全大写字母加下划线，但现代 C++ 中应尽量避免使用宏。
+
+```cpp
+// 常量命名示例
+const int kMaxBufferSize = 1024;
+constexpr double kPi = 3.14159265358979;
+
+enum class Color {
+    kRed,
+    kGreen,
+    kBlue
+};
+
+// 宏命名（尽量避免使用宏）
+#define DEPRECATED_FUNCTION __attribute__((deprecated))
+```
+
+命名空间使用小写字母，通常是项目名或模块名的缩写。命名空间用于避免全局命名冲突，尤其在大型项目中非常重要。
+
+```cpp
+// 命名空间示例
+namespace rm {           // RoboMaster 项目
+namespace vision {       // 视觉模块
+    class Detector { /* ... */ };
+}  // namespace vision
+}  // namespace rm
+
+// 使用
+rm::vision::Detector detector;
+```
+
+除了遵循格式规则，命名还有更本质的要求：名称应该准确、完整地描述其代表的含义。避免使用过于简短或含糊的名称，如 `temp`、`data`、`info`、`process()`；也避免使用过于冗长的名称，如 `the_current_image_frame_from_camera`。好的名称应该在准确和简洁之间取得平衡。在循环中使用 `i`、`j` 作为索引变量是可以接受的约定，但在其他场景下，应该使用更有意义的名称。
+
+```cpp
+// 不好的命名
+int n;                          // 什么的数量？
+void Process();                 // 处理什么？怎么处理？
+std::vector<int> data;          // 什么数据？
+
+// 好的命名
+int target_count;
+void ProcessImage();
+std::vector<int> detection_scores;
+```
+
+==== 格式规范
+
+格式规范涉及代码的视觉呈现：缩进、空格、换行、大括号位置等。良好的格式让代码结构一目了然，就像排版精美的书籍比手写稿更易阅读。
+
+缩进使用空格而非制表符，每级缩进 2 个或 4 个空格（Google 风格是 2 个，许多团队选择 4 个）。制表符在不同编辑器中可能显示为不同宽度，导致代码在你的屏幕上对齐完美，在别人的屏幕上却参差不齐。使用空格可以避免这个问题。
+
+```cpp
+// 缩进示例（2 空格）
+class Robot {
+  void Move() {
+    if (is_enabled_) {
+      for (int i = 0; i < 10; ++i) {
+        Step();
+      }
+    }
+  }
+};
+```
+
+每行代码的长度应该限制在一定范围内，通常是 80 或 100 个字符。过长的行需要水平滚动才能看完，降低了可读性。当一行太长时，应该合理地换行。函数调用参数过多时，可以每个参数一行；长表达式可以在运算符处断开。
+
+```cpp
+// 长行换行示例
+void ProcessTarget(const Target& target,
+                   const CameraParams& camera_params,
+                   const GimbalState& gimbal_state,
+                   std::vector<Result>* results);
+
+// 长表达式换行
+double distance = std::sqrt(
+    (target.x - origin.x) * (target.x - origin.x) +
+    (target.y - origin.y) * (target.y - origin.y) +
+    (target.z - origin.z) * (target.z - origin.z));
+```
+
+大括号的位置是一个经典的"圣战"话题。Google C++ Style Guide 规定：函数的左大括号另起一行，其他情况（类定义、控制语句等）左大括号放在行尾。但实际上，许多团队选择统一将左大括号放在行尾（K&R 风格），或者统一另起一行（Allman 风格）。无论选择哪种，团队内部保持一致即可。
+
+```cpp
+// Google 风格：函数大括号另起一行，其他在行尾
+class Robot {
+  void Move() {
+    if (is_enabled_) {
+      // ...
+    }
+  }
+};
+
+// K&R 风格：所有大括号都在行尾
+class Robot {
+  void Move() {
+    if (is_enabled_) {
+      // ...
+    }
+  }
+};
+
+// Allman 风格：所有大括号都另起一行
+class Robot
+{
+  void Move()
+  {
+    if (is_enabled_)
+    {
+      // ...
+    }
+  }
+};
+```
+
+空格的使用应该一致且有助于可读性。二元运算符两边加空格，一元运算符不加；逗号和分号后面加空格，前面不加；控制语句的关键字与括号之间加空格，函数名与括号之间不加。
+
+```cpp
+// 空格使用示例
+int sum = a + b * c;              // 二元运算符两边加空格
+int neg = -value;                 // 一元运算符不加
+Call(arg1, arg2, arg3);           // 逗号后加空格
+for (int i = 0; i < n; ++i)       // for 后加空格，分号后加空格
+if (condition) {                  // if 后加空格
+    DoSomething();                // 函数名与括号之间不加
+}
+```
+
+空行用于分隔逻辑上独立的代码块。函数之间用一个空行分隔；函数内部，不同逻辑步骤之间可以用空行分隔；但不要过度使用空行，导致代码过于稀疏。头文件的 `#include` 部分，通常按组分隔：系统头文件、第三方库头文件、项目头文件，每组之间用空行分隔。
+
+```cpp
+#include <vector>
+#include <string>
+
+#include <opencv2/opencv.hpp>
+#include <Eigen/Dense>
+
+#include "robot/vision/detector.h"
+#include "robot/common/types.h"
+```
+
+==== 注释规范
+
+注释是代码与人之间的对话。好的注释解释"为什么"而不是"是什么"——代码本身已经说明了它在做什么，注释应该补充代码无法表达的信息：为什么选择这种方案、这里有什么需要注意的陷阱、这个魔法数字的来源是什么。
+
+文件头注释出现在每个文件的开头，说明文件的用途、作者、创建日期、版权信息等。不同团队对文件头的要求不同，有的要求详尽，有的比较简略。
+
+```cpp
+// Copyright 2024 RoboMaster Team. All rights reserved.
+//
+// Licensed under the MIT License.
+//
+// Author: Zhang San <zhangsan@example.com>
+// Date: 2024-01-15
+//
+// This file implements the armor detector for RoboMaster robots.
+// The detector uses color and shape features to identify enemy armor plates.
+```
+
+类注释放在类定义之前，说明类的用途、使用方法和注意事项。对于复杂的类，还应该说明其线程安全性、生命周期管理等。
+
+```cpp
+// ArmorDetector detects enemy armor plates from camera images.
+//
+// Usage:
+//   ArmorDetector detector(config);
+//   detector.Init();
+//   auto armors = detector.Detect(image);
+//
+// Thread safety: This class is NOT thread-safe. Each thread should
+// create its own instance.
+class ArmorDetector {
+    // ...
+};
+```
+
+函数注释放在函数声明之前，说明函数的功能、参数含义、返回值和可能抛出的异常。对于简单的函数，如果函数名已经足够清晰，可以省略注释。
+
+```cpp
+// Detects armor plates in the given image.
+//
+// Args:
+//   image: The input BGR image from camera.
+//   timestamp: The timestamp when the image was captured.
+//
+// Returns:
+//   A vector of detected armor plates, sorted by confidence.
+//   Returns an empty vector if no armor is detected.
+//
+// Throws:
+//   std::invalid_argument if image is empty.
+std::vector<Armor> Detect(const cv::Mat& image, double timestamp);
+```
+
+行内注释用于解释单行或几行代码。它们应该放在代码的上方或右侧，解释代码的意图或需要注意的地方。避免写没有信息量的注释，如 `i++; // increment i`。
+
+```cpp
+// Apply bilateral filter to reduce noise while preserving edges.
+// Bilateral filter is slower than Gaussian but better for armor detection.
+cv::bilateralFilter(image, filtered, 9, 75, 75);
+
+int retry_count = 0;
+const int kMaxRetries = 3;  // Determined by network latency tests
+while (retry_count < kMaxRetries) {
+    // ...
+}
+```
+
+TODO 注释用于标记需要后续处理的地方。它们应该包含具体的任务描述，最好还有负责人和预计完成时间。TODO 不应该长期存在——如果一个 TODO 超过一个月还没有处理，要么应该立即处理，要么应该删除或转为正式的任务跟踪。
+
+```cpp
+// TODO(zhangsan): Optimize this loop using SIMD. Current implementation
+// is too slow for 60fps processing. Expected completion: 2024-02.
+for (int i = 0; i < n; ++i) {
+    // ...
+}
+```
+
+==== 头文件规范
+
+头文件的组织对大型项目的编译效率和模块化至关重要。良好的头文件实践可以减少编译依赖、加快编译速度、避免重复包含等问题。
+
+防止头文件重复包含有两种方式：`#pragma once` 和传统的 `#ifndef` 守卫。`#pragma once` 更简洁，被所有主流编译器支持，是现代 C++ 推荐的方式。
+
+```cpp
+// 推荐：使用 #pragma once
+#pragma once
+
+class MyClass {
+    // ...
+};
+
+// 传统方式：#ifndef 守卫
+#ifndef PROJECT_MODULE_MY_CLASS_H_
+#define PROJECT_MODULE_MY_CLASS_H_
+
+class MyClass {
+    // ...
+};
+
+#endif  // PROJECT_MODULE_MY_CLASS_H_
+```
+
+头文件中应该只包含必要的声明，实现放在源文件中。尽量使用前向声明（forward declaration）代替包含头文件，减少编译依赖。如果只需要使用指针或引用，就不需要包含完整的类定义。
+
+```cpp
+// my_class.h
+#pragma once
+
+class OtherClass;  // 前向声明，不需要 #include "other_class.h"
+
+class MyClass {
+public:
+    void Process(OtherClass* obj);  // 只用指针，不需要完整定义
+    
+private:
+    OtherClass* other_;  // 只用指针，不需要完整定义
+};
+
+// my_class.cpp
+#include "my_class.h"
+#include "other_class.h"  // 实现时才需要完整定义
+
+void MyClass::Process(OtherClass* obj) {
+    obj->DoSomething();  // 调用成员函数需要完整定义
+}
+```
+
+`#include` 的顺序有助于发现遗漏的依赖。推荐的顺序是：首先包含当前文件对应的头文件（如 `foo.cpp` 首先包含 `foo.h`），然后是系统头文件，接着是第三方库头文件，最后是项目内部头文件。每组之间用空行分隔，每组内部按字母顺序排列。
+
+```cpp
+// image_processor.cpp
+#include "vision/image_processor.h"  // 对应的头文件放第一个
+
+#include <algorithm>
+#include <vector>
+
+#include <opencv2/opencv.hpp>
+#include <Eigen/Dense>
+
+#include "common/config.h"
+#include "vision/detector.h"
+```
+
+将对应的头文件放在第一个是一个聪明的技巧：如果这个头文件缺少某些必要的 `#include`，编译这个源文件时会立即报错，而不是等到其他文件包含它时才发现问题。
+
+==== 现代 C++ 的额外建议
+
+Google C++ Style Guide 最初制定时，C++11 还未发布。随着现代 C++ 的发展，一些额外的建议值得补充。
+
+优先使用 `auto` 进行类型推导，特别是当类型很长或很明显时。但不要滥用——当类型对理解代码很重要时，显式写出类型更好。
+
+```cpp
+// 好：类型很长或很明显
+auto iter = container.begin();
+auto result = std::make_unique<MyClass>();
+auto lambda = [](int x) { return x * 2; };
+
+// 好：显式类型让意图更清晰
+double ratio = GetRatio();  // 而不是 auto ratio = GetRatio();
+```
+
+使用初始化列表语法（`{}`）初始化变量，它可以防止窄化转换，更加安全。但要注意 `std::vector` 等容器的特殊情况。
+
+```cpp
+int value{42};
+std::string name{"robot"};
+std::vector<int> sizes{1, 2, 3};  // 包含三个元素
+
+// 注意区分
+std::vector<int> v1(5);     // 5 个元素，值为 0
+std::vector<int> v2{5};     // 1 个元素，值为 5
+std::vector<int> v3(5, 1);  // 5 个元素，值为 1
+```
+
+使用 `nullptr` 而不是 `NULL` 或 `0` 表示空指针。`nullptr` 有明确的类型，可以避免函数重载时的歧义。
+
+```cpp
+void Process(int value);
+void Process(int* ptr);
+
+Process(NULL);     // 歧义：可能调用 Process(int)
+Process(nullptr);  // 明确：调用 Process(int*)
+```
+
+使用范围 for 循环遍历容器，更简洁也更不容易出错。
+
+```cpp
+std::vector<Target> targets = GetTargets();
+
+// 传统方式
+for (size_t i = 0; i < targets.size(); ++i) {
+    Process(targets[i]);
+}
+
+// 现代方式
+for (const auto& target : targets) {
+    Process(target);
+}
+```
+
+使用 `enum class` 而不是普通 `enum`，避免枚举值污染外层命名空间，也更类型安全。
+
+```cpp
+// 不好：枚举值泄漏到外层
+enum Color { Red, Green, Blue };
+int Red = 5;  // 错误：重定义
+
+// 好：枚举值限定在枚举类内
+enum class Color { kRed, kGreen, kBlue };
+int Red = 5;  // OK
+Color c = Color::kRed;
+```
+
+使用智能指针管理动态内存，避免手动 `new` 和 `delete`。优先使用 `std::unique_ptr`，只在需要共享所有权时使用 `std::shared_ptr`。
+
+```cpp
+// 不好：手动管理内存
+MyClass* obj = new MyClass();
+// ... 如果中间抛出异常，内存泄漏
+delete obj;
+
+// 好：使用智能指针
+auto obj = std::make_unique<MyClass>();
+// 离开作用域自动释放，异常安全
+```
+
+==== 工具辅助
+
+手动维护代码格式既繁琐又容易遗漏。幸运的是，有成熟的工具可以自动化这项工作。
+
+clang-format 是 LLVM 项目提供的代码格式化工具，支持多种预设风格（Google、LLVM、Chromium 等），也可以通过配置文件自定义。它可以集成到编辑器中，在保存文件时自动格式化，或者作为 CI 检查的一部分。
+
+```bash
+# 使用 Google 风格格式化文件
+clang-format -style=Google -i my_file.cpp
+
+# 使用配置文件格式化
+clang-format -style=file -i my_file.cpp
+
+# 检查是否符合格式（用于 CI）
+clang-format -style=file --dry-run --Werror my_file.cpp
+```
+
+clang-format 的配置文件名为 `.clang-format`，放在项目根目录下。以下是一个基于 Google 风格的配置示例，适合 RoboMaster 项目使用：
+
+```yaml
+# .clang-format
+BasedOnStyle: Google
+
+# 缩进设置
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+
+# 行宽限制
+ColumnLimit: 100
+
+# 大括号风格
+BreakBeforeBraces: Attach
+
+# 指针和引用的对齐
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# 头文件排序
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<.*>'
+    Priority: 1
+  - Regex: '^".*"'
+    Priority: 2
+
+# 其他
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+```
+
+clang-tidy 是另一个 LLVM 工具，用于静态代码分析。它不仅检查格式，还能发现潜在的 bug、性能问题和不符合最佳实践的代码。clang-tidy 可以配置启用哪些检查，并能自动修复某些问题。
+
+```bash
+# 运行 clang-tidy 检查
+clang-tidy my_file.cpp -- -std=c++17
+
+# 自动修复可修复的问题
+clang-tidy -fix my_file.cpp -- -std=c++17
+```
+
+在 VS Code 中，可以安装 C/C++ 扩展和 Clang-Format 扩展，配置保存时自动格式化。在 CLion 中，clang-format 支持是内置的。将格式化工具集成到开发流程中，可以让团队成员无需刻意关注格式问题，工具会自动处理。
+
+==== 代码审查
+
+代码审查（Code Review）是指在代码合并到主分支之前，由其他团队成员检查代码的过程。它是保障代码质量、传播知识、统一风格的重要实践。
+
+代码审查的价值远不止于发现 bug。通过审查，团队成员可以相互学习——资深成员可以指导新成员，新成员的新鲜视角有时也能发现资深成员忽视的问题。审查过程中的讨论可以统一团队对技术问题的认识，形成共同的最佳实践。知道代码会被审查，编写者也会更加用心，不会轻易提交敷衍的代码。
+
+代码审查应该关注什么？首先是正确性——代码是否实现了预期的功能，是否有逻辑错误，边界条件是否处理正确。其次是可维护性——代码是否清晰易懂，命名是否恰当，结构是否合理，是否有足够的注释。然后是一致性——代码是否符合团队规范，是否与代码库中其他部分风格一致。最后是性能和安全——是否有明显的性能问题，是否存在安全隐患。
+
+作为审查者，应该提供建设性的反馈，而不是简单地批评。指出问题的同时，最好给出改进建议。对于风格问题，如果有工具可以自动检查，就不需要在审查中花费过多精力。尊重被审查者的工作，认可做得好的地方。
+
+作为被审查者，应该以开放的心态接受反馈。审查的目的是改进代码，而不是评价人。对于不同意的反馈，可以讨论，但要用事实和理由说服对方，而不是固执己见。将审查意见视为学习机会，而不是对自己的否定。
+
+```
+代码审查清单：
+□ 代码是否实现了需求描述的功能？
+□ 逻辑是否正确？边界条件是否处理？
+□ 命名是否清晰、一致？
+□ 代码结构是否清晰？函数是否过长？
+□ 注释是否充分？是否解释了"为什么"？
+□ 是否有重复代码可以提取？
+□ 错误处理是否完善？
+□ 是否有明显的性能问题？
+□ 是否符合团队代码规范？
+□ 测试是否充分？
+```
+
+==== RoboMaster 团队代码规范建议
+
+基于以上讨论，这里为 RoboMaster 团队提供一些具体的代码规范建议。这些建议可以作为起点，团队可以根据自己的情况调整。
+
+关于命名，建议使用 Google 风格：类型用 `PascalCase`，变量和函数参数用 `snake_case`，成员变量末尾加下划线，常量用 `kPascalCase`。对于 RoboMaster 项目中的特定概念，建议统一术语：敌方装甲板用 `Armor`，云台用 `Gimbal`，底盘用 `Chassis`，自瞄用 `AutoAim` 等。
+
+关于格式，建议使用 4 空格缩进、100 字符行宽、K&R 大括号风格。这与 ROS 社区的习惯相近，也是许多团队的偏好。使用 clang-format 自动化格式检查，将配置文件纳入版本控制。
+
+关于项目结构，建议按功能模块组织代码：`vision/`（视觉）、`control/`（控制）、`communication/`（通信）、`common/`（公共）等。每个模块有自己的头文件目录和源文件目录。使用命名空间与目录结构对应，如 `rm::vision`、`rm::control`。
+
+```
+robomaster_project/
+├── CMakeLists.txt
+├── .clang-format
+├── README.md
+├── include/
+│   └── rm/
+│       ├── vision/
+│       │   ├── detector.h
+│       │   └── tracker.h
+│       ├── control/
+│       │   ├── gimbal_controller.h
+│       │   └── chassis_controller.h
+│       └── common/
+│           ├── types.h
+│           └── config.h
+├── src/
+│   ├── vision/
+│   ├── control/
+│   └── common/
+└── test/
+    ├── vision/
+    └── control/
+```
+
+关于注释，建议所有公开的类和函数都有文档注释，说明功能、参数和返回值。对于复杂的算法，添加解释原理的注释或引用相关论文。对于临时的解决方案或已知的限制，使用 TODO 或 FIXME 标记。
+
+关于代码审查，建议所有代码在合并前至少经过一人审查。对于核心模块的修改，建议有两人审查。审查时使用检查清单，确保不遗漏重要方面。将代码审查作为团队文化的一部分，而不是可选的流程。
+
+代码规范不是一成不变的教条，而是团队协作的工具。最重要的是团队达成共识，并且一致地执行。工具可以帮助自动化格式检查，但对命名、设计、文档的关注需要每个成员的自觉。当遵循规范成为习惯，代码质量自然会提升，团队协作也会更加顺畅。
+
+
+
 === 设计模式的起源
 *设计模式*(Design pattern)是软件开发者在长期实践中提炼出的、可复用的代码设计经验，它们经过大量项目验证，被系统化分类，并形成了完整的知识体系。设计模式是软件工程的基石脉络，如同大厦的结构一样。
 
@@ -75,3 +673,848 @@
 也称为*最少知识原则*，要求一个实体应当尽量少地与其他实体发生相互作用，使得系统功能模块相对独立，从而降低各个对象之间的耦合，提高系统的可维护性。
 
 例如在程序设计中，各个模块之间相互调用时，通常会提供一个统一的接口来实现功能。这样其他模块不需要了解模块内部的实现细节（黑盒原理），当一个模块内部的实现发生改变时，不会影响其他模块的使用。
+
+
+=== 常用设计模式详解
+// 机器人开发中最实用的模式
+// - 单例模式（Singleton）
+//   经典实现与问题
+//   现代 C++ 的线程安全实现（Meyers' Singleton）
+//   应用场景：配置管理、日志系统、硬件抽象
+//   滥用警告与替代方案
+// - 工厂模式（Factory）
+//   简单工厂 vs 工厂方法 vs 抽象工厂
+//   应用场景：传感器驱动创建、算法策略选择
+// - 观察者模式（Observer）
+//   发布-订阅机制
+//   与 ROS 话题机制的对比
+//   应用场景：事件系统、状态通知
+// - 策略模式（Strategy）
+//   算法族的封装与切换
+//   应用场景：不同的瞄准算法、路径规划策略
+// - 状态模式（State）
+//   有限状态机的面向对象实现
+//   应用场景：机器人行为状态管理
+// - 模板方法模式（Template Method）
+//   定义算法骨架，子类实现细节
+//   应用场景：图像处理流水线
+
+=== 单元测试
+// 用测试保障代码质量
+// - 为什么要写测试：信心与重构
+// - 测试金字塔：单元测试、集成测试、端到端测试
+// - Google Test 框架入门：
+//   安装与 CMake 配置
+//   TEST 宏与断言（EXPECT_* vs ASSERT_*）
+//   测试夹具（Test Fixtures）
+//   参数化测试
+// - 测试驱动开发（TDD）简介
+// - 什么样的代码容易测试
+// - Mock 与依赖注入
+// - 测试覆盖率
+// - RoboMaster 中的测试实践：
+//   算法模块的单元测试
+//   通信协议的测试
+//   仿真环境的价值
+
+=== 调试技巧
+// 高效定位问题
+// - 调试的心态：科学方法论
+// - printf/cout 调试法的局限
+// - GDB 调试器：
+//   基本命令（run, break, next, step, continue, print）
+//   查看调用栈（backtrace）
+//   条件断点与观察点
+//   调试多线程程序
+//   调试 core dump
+//   GDB TUI 模式
+// - VS Code + GDB 图形化调试
+// - 日志系统设计：
+//   日志级别（DEBUG, INFO, WARN, ERROR, FATAL）
+//   结构化日志
+//   日志轮转
+//   spdlog 库简介
+// - 内存调试：
+//   Valgrind 检测内存泄漏
+//   AddressSanitizer (ASan)
+//   常见内存问题模式
+// - 常见 bug 类型与排查思路
+
+=== 性能分析与优化
+// 让程序跑得更快
+// - 过早优化是万恶之源
+// - 性能分析工作流：测量 → 分析 → 优化 → 验证
+// - 时间测量：
+//   std::chrono 精确计时
+//   基准测试框架（Google Benchmark）
+// - 性能分析工具：
+//   perf 基础使用
+//   火焰图（Flame Graph）
+//   Valgrind callgrind
+//   Intel VTune（简介）
+// - 常见优化方向：
+//   算法复杂度
+//   内存访问模式（缓存友好）
+//   避免不必要的拷贝（移动语义）
+//   减少内存分配
+//   多线程并行
+// - 编译器优化选项（-O2, -O3, -march）
+// - RoboMaster 性能优化案例：
+//   图像处理流水线优化
+//   控制循环的实时性保障
+
+=== 文档编写
+// 代码之外的工程产出
+// - 文档的价值：写给未来的自己和队友
+// - 代码即文档：自解释的命名与结构
+// - 注释的艺术：何时写、写什么
+// - README 的标准结构
+// - API 文档：
+//   Doxygen 入门
+//   文档注释规范
+//   生成 HTML/PDF 文档
+// - 项目文档类型：
+//   需求文档
+//   设计文档
+//   用户手册
+//   变更日志（CHANGELOG）
+// - Markdown 写作技巧
+// - 文档即代码：版本控制与持续更新
+// - RoboMaster 文档实践：
+//   赛季交接文档的重要性
+//   硬件接口文档
+//   调试手册
+// === 文档编写
+
+代码是程序员与机器的对话，而文档是程序员与人的对话——可能是与队友、与未来的维护者，也可能是与几个月后已经忘记实现细节的自己。许多程序员不喜欢写文档，觉得这是编码之外的"杂事"，浪费时间。但当你在凌晨三点调试一个陌生的模块，翻遍代码却找不到任何解释时；当新队员接手项目，花了一周时间还没搞清楚系统架构时；当你试图使用去年写的库，却想不起那些参数是什么含义时——你会深刻体会到文档的价值。好的文档是项目的第二生命，它让知识得以传承，让协作成为可能。
+
+==== 文档的价值
+
+文档最直接的价值是降低沟通成本。在一个团队中，如果每个问题都需要口头解释，那么回答问题的人会被频繁打断，提问的人也要等待对方有空。而一份好的文档可以回答大多数常见问题，让团队成员能够自助式地获取信息。当有人问"这个函数怎么用"或"这个模块是做什么的"时，你可以说"看文档"，而不是每次都从头解释一遍。
+
+文档的另一个重要价值是保存知识。人的记忆是不可靠的，今天清清楚楚的设计决策，三个月后可能就想不起来了。更何况团队成员会毕业、会换项目，如果知识只存在于人的脑子里，人走了知识也就丢了。文档将知识外化，使其独立于任何个人而存在。一份记录了设计思路、架构决策、踩过的坑的文档，是团队最宝贵的资产之一。
+
+文档还能帮助作者理清思路。写文档的过程迫使你用清晰的语言解释自己的设计，这个过程往往会暴露出之前没有意识到的问题。如果你发现某个部分很难解释清楚，很可能是因为设计本身就不够清晰。有经验的工程师常常在写代码之前先写设计文档，通过写作来思考和验证方案。
+
+对于 RoboMaster 团队来说，文档还有一层特殊的意义：赛季传承。每年都有老队员毕业、新队员加入，如果没有文档，新人只能从零开始摸索，前人的经验无法积累。而有了好的文档，新队员可以快速了解系统全貌，在前人的基础上继续前进，而不是每年都在重复发明轮子。
+
+==== 代码即文档
+
+在讨论如何写文档之前，我们首先要认识到：最好的文档是代码本身。如果代码写得足够清晰，很多时候不需要额外的解释。这就是"代码即文档"（Code as Documentation）的理念。
+
+清晰的命名是代码自解释的基础。一个名为 `CalculateProjectileDropCompensation` 的函数，不需要注释也能让人明白它是计算弹道下坠补偿的。而一个名为 `Calc` 的函数，即使有注释也需要读者花费额外的精力去理解。变量名也是如此：`remainingAmmo` 比 `n` 有意义得多。好的命名就像好的路标，让读者不需要地图也能找到方向。
+
+合理的代码结构也是一种文档。当一个函数只做一件事、一个类只有一个职责时，代码的意图就很明显。当相关的功能被组织在一起、模块之间有清晰的边界时，系统的架构就呼之欲出。相反，如果一个函数做了十件不同的事，即使每一行都有注释，也很难理解它的整体逻辑。
+
+类型系统也是文档的一部分。在 C++ 中，使用强类型而不是原始类型可以传达更多信息。例如，`Angle` 类型比 `double` 更能说明参数的含义；`std::optional<Target>` 比返回空指针更能表达"可能没有结果"的语义；`enum class RobotState` 比一堆整数常量更能说明状态的含义和取值范围。
+
+```cpp
+// 不好：类型没有传达信息
+double Calculate(double a, double b, int mode);
+
+// 好：类型本身就是文档
+Velocity CalculateVelocity(Distance distance, Duration time);
+std::optional<Target> DetectTarget(const Image& image);
+```
+
+常量和配置也应该自解释。不要在代码中使用魔法数字，而是定义有意义的常量。当读者看到 `kMaxDetectionDistance` 时，他立刻知道这是最大检测距离；而看到 `5.0` 时，他只能猜测这个数字的含义。
+
+```cpp
+// 不好：魔法数字
+if (distance < 5.0 && confidence > 0.8) {
+    Fire();
+}
+
+// 好：有意义的常量
+constexpr double kMaxFiringDistance = 5.0;  // meters
+constexpr double kMinConfidenceThreshold = 0.8;
+
+if (distance < kMaxFiringDistance && confidence > kMinConfidenceThreshold) {
+    Fire();
+}
+```
+
+然而，代码即文档有其局限性。代码能够说明"是什么"（what）和"怎么做"（how），但很难表达"为什么"（why）。为什么选择这个算法而不是那个？为什么这个参数是 5.0 而不是 3.0？为什么要加这个看起来多余的检查？这些问题需要注释和文档来回答。
+
+==== 注释的艺术
+
+注释是代码中嵌入的文档，用于解释代码本身无法表达的信息。好的注释能够显著提高代码的可读性，而糟糕的注释则可能误导读者、浪费时间。掌握何时写注释、写什么注释，是一门需要练习的艺术。
+
+首先要明确的是，注释不是用来解释代码"做了什么"的。如果代码需要注释来解释它在做什么，这通常意味着代码本身不够清晰，应该重构而不是添加注释。那些像 `i++; // 将 i 加 1` 这样的注释毫无价值，只会增加阅读负担。
+
+注释真正的价值在于解释"为什么"。为什么选择这种实现方式？有什么约束或权衡？这里有什么需要注意的陷阱？这些是代码本身无法表达的信息，是注释的用武之地。
+
+```cpp
+// 不好：解释"是什么"
+// 遍历所有目标
+for (const auto& target : targets) {
+    // 如果目标在范围内
+    if (target.distance < max_distance) {
+        // 添加到结果中
+        results.push_back(target);
+    }
+}
+
+// 好：解释"为什么"
+// 优先处理近距离目标，因为它们对比赛结果影响更大。
+// 远距离目标的检测置信度较低，容易产生误判。
+for (const auto& target : targets) {
+    if (target.distance < max_distance) {
+        results.push_back(target);
+    }
+}
+```
+
+注释还应该解释非显而易见的代码。有时候，为了性能、兼容性或规避某个 bug，代码不得不写得比较晦涩。这时候，注释可以解释这样写的原因，避免后人"好心"地重构掉这些看起来奇怪的代码。
+
+```cpp
+// 使用位运算代替除法，在 ARM 平台上快约 10 倍。
+// 仅当 divisor 是 2 的幂时有效。
+int FastDivide(int value, int divisor) {
+    int shift = __builtin_ctz(divisor);  // 计算尾随零的个数
+    return value >> shift;
+}
+
+// OpenCV 4.2 之前的版本在这里有内存泄漏，需要手动释放。
+// 参见：https://github.com/opencv/opencv/issues/12345
+cv::Mat temp;
+// ... 使用 temp ...
+temp.release();  // 必要的手动释放
+```
+
+注释应该解释假设和约束。函数对输入有什么要求？调用时需要满足什么前置条件？有什么副作用？这些信息可以帮助调用者正确使用代码。
+
+```cpp
+// 计算两点之间的角度。
+// 假设：两点不重合（distance > 0）。
+// 返回值：弧度，范围 [-π, π]。
+// 注意：此函数不是线程安全的，因为它使用了全局缓存。
+double CalculateAngle(const Point& from, const Point& to);
+```
+
+注释要保持与代码同步。过时的注释比没有注释更糟糕，因为它会误导读者。当修改代码时，一定要检查相关注释是否需要更新。如果一段注释描述的行为与代码不符，读者会困惑：是代码错了还是注释错了？为了降低注释过时的风险，注释应该描述意图和原因，而不是复述代码的实现细节——意图通常比实现稳定。
+
+TODO 和 FIXME 注释用于标记待办事项和已知问题。它们是对未来的承诺，提醒自己或他人这里还有工作要做。好的 TODO 注释应该包含具体的任务描述、负责人和预期时间。定期清理 TODO 是良好的习惯——如果一个 TODO 存在超过一个月还没处理，要么立即处理，要么承认它不重要并删除。
+
+```cpp
+// TODO(zhangsan): 实现多目标跟踪。当前只支持单目标。
+//                 预计下周完成。
+
+// FIXME: 在光线变化剧烈时会产生误检。
+//        需要添加时域滤波来改善稳定性。
+
+// HACK: 临时解决方案，等待上游库修复后移除。
+//       跟踪 issue: https://github.com/xxx/xxx/issues/123
+```
+
+==== README：项目的门面
+
+README 是项目的门面，通常是用户接触项目的第一份文档。一份好的 README 能让人在几分钟内了解项目是什么、能做什么、怎么开始使用。它应该简洁但完整，回答读者最关心的问题。
+
+一份标准的 README 通常包含以下部分：
+
+项目标题和简介放在最开头，用一两句话说明项目是什么、解决什么问题。如果有项目 logo 或徽章（构建状态、版本号等），可以放在这里。
+
+```markdown
+# RoboMaster Vision System
+
+基于深度学习的 RoboMaster 自瞄视觉系统，支持装甲板检测、跟踪和预测。
+
+![Build Status](https://img.shields.io/badge/build-passing-green)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
+```
+
+功能特性列出项目的主要功能，让读者快速了解项目能做什么。可以用列表形式简洁地呈现。
+
+```markdown
+## 功能特性
+
+- 🎯 实时装甲板检测（60+ FPS @ 1080p）
+- 🔄 多目标跟踪与 ID 关联
+- 📈 基于卡尔曼滤波的运动预测
+- 🎮 支持 ROS 2 Humble 集成
+- ⚡ CUDA 加速推理
+```
+
+快速开始是最重要的部分之一，它应该让读者能够在最短时间内运行项目。包括环境要求、安装步骤和基本使用示例。命令应该可以直接复制执行，不要让读者猜测。
+
+````markdown
+## 快速开始
+
+### 环境要求
+
+- Ubuntu 22.04
+- ROS 2 Humble
+- CUDA 11.8+
+- OpenCV 4.5+
+
+### 安装
+
+```bash
+# 克隆仓库
+git clone https://github.com/your-team/rm_vision.git
+cd rm_vision
+
+# 安装依赖
+./scripts/install_dependencies.sh
+
+# 编译
+colcon build --symlink-install
+```
+
+### 运行
+
+```bash
+# 启动检测节点
+ros2 launch rm_vision detector.launch.py
+
+# 使用录制的数据测试
+ros2 launch rm_vision detector.launch.py use_bag:=true bag_path:=/path/to/bag
+```
+````
+
+配置说明解释主要的配置选项，让用户知道如何根据自己的需求调整系统。可以提供配置文件的示例和各选项的含义。
+
+````markdown
+## 配置
+
+配置文件位于 `config/detector_params.yaml`：
+
+```yaml
+detector:
+  model_path: "models/armor_yolov8.onnx"  # 模型路径
+  confidence_threshold: 0.7               # 置信度阈值
+  nms_threshold: 0.4                      # NMS 阈值
+  target_color: "red"                     # 目标颜色
+```
+````
+
+项目结构帮助读者理解代码的组织方式，特别是对于想要深入了解或贡献代码的人。
+
+````markdown
+## 项目结构
+
+```
+rm_vision/
+├── rm_vision/           # 主功能包
+│   ├── detector/        # 装甲板检测
+│   ├── tracker/         # 目标跟踪
+│   └── predictor/       # 运动预测
+├── rm_interfaces/       # 消息和服务定义
+├── rm_bringup/          # 启动文件
+├── config/              # 配置文件
+├── models/              # 预训练模型
+└── docs/                # 详细文档
+```
+````
+
+其他可选部分包括：详细文档的链接、贡献指南、许可证信息、致谢、联系方式等。对于开源项目，这些信息尤其重要。
+
+```markdown
+## 文档
+
+详细文档请参阅 [Wiki](https://github.com/your-team/rm_vision/wiki)。
+
+## 贡献
+
+欢迎贡献！请阅读 [贡献指南](CONTRIBUTING.md) 了解如何参与。
+
+## 许可证
+
+本项目采用 MIT 许可证。详见 [LICENSE](LICENSE)。
+
+## 致谢
+
+- 感谢 [YOLO](https://github.com/ultralytics/yolov5) 提供的目标检测框架
+- 感谢历届队员的贡献
+
+## 联系我们
+
+- 邮箱：robomaster@example.com
+- QQ 群：123456789
+```
+
+==== API 文档与 Doxygen
+
+对于库或框架，API 文档是不可或缺的。它详细描述每个类、函数、参数的用法，是开发者使用库时的参考手册。手写 API 文档工作量大且容易过时，因此通常使用工具从代码中的注释自动生成。Doxygen 是 C++ 社区最流行的文档生成工具。
+
+Doxygen 通过解析代码中特定格式的注释来生成文档。最常用的注释风格是 Javadoc 风格（以 `/**` 开头）和 Qt 风格（以 `/*!` 开头）。以下是一些常用的 Doxygen 命令：
+
+```cpp
+/**
+ * @file armor_detector.h
+ * @brief 装甲板检测器的头文件
+ * @author Zhang San
+ * @date 2024-01-15
+ */
+
+/**
+ * @brief 装甲板检测器类
+ * 
+ * ArmorDetector 使用深度学习模型检测图像中的装甲板。
+ * 它支持红色和蓝色装甲板的检测，并能处理不同光照条件。
+ * 
+ * @note 此类不是线程安全的。每个线程应创建独立的实例。
+ * 
+ * 使用示例：
+ * @code
+ * ArmorDetector detector(config);
+ * detector.Init();
+ * auto armors = detector.Detect(image);
+ * for (const auto& armor : armors) {
+ *     std::cout << "检测到装甲板，置信度: " << armor.confidence << std::endl;
+ * }
+ * @endcode
+ * 
+ * @see Tracker 用于目标跟踪
+ * @see Predictor 用于运动预测
+ */
+class ArmorDetector {
+public:
+    /**
+     * @brief 构造函数
+     * @param config 检测器配置参数
+     * @throws std::invalid_argument 如果配置无效
+     */
+    explicit ArmorDetector(const DetectorConfig& config);
+    
+    /**
+     * @brief 初始化检测器
+     * 
+     * 加载模型并准备推理引擎。此方法必须在 Detect() 之前调用。
+     * 
+     * @return true 如果初始化成功
+     * @return false 如果初始化失败（如模型文件不存在）
+     */
+    bool Init();
+    
+    /**
+     * @brief 检测图像中的装甲板
+     * 
+     * @param image 输入图像，必须是 BGR 格式
+     * @param timestamp 图像时间戳，用于时间同步
+     * @return 检测到的装甲板列表，按置信度降序排列
+     * 
+     * @pre Init() 已成功调用
+     * @pre image 不为空
+     * 
+     * @warning 此方法会修改内部状态，不要在多线程中共享实例
+     */
+    std::vector<Armor> Detect(const cv::Mat& image, double timestamp);
+    
+    /**
+     * @brief 设置目标颜色
+     * @param color 目标颜色
+     * @see TargetColor
+     */
+    void SetTargetColor(TargetColor color);
+    
+    /**
+     * @brief 获取当前检测统计信息
+     * @return 包含检测帧数、平均耗时等的统计信息
+     */
+    DetectorStats GetStats() const;
+
+private:
+    DetectorConfig config_;  ///< 检测器配置
+    bool initialized_;       ///< 是否已初始化
+    // ...
+};
+
+/**
+ * @brief 目标颜色枚举
+ */
+enum class TargetColor {
+    kRed,   ///< 红色方
+    kBlue   ///< 蓝色方
+};
+
+/**
+ * @struct Armor
+ * @brief 装甲板检测结果
+ */
+struct Armor {
+    cv::Point2f center;     ///< 装甲板中心点（像素坐标）
+    cv::Size2f size;        ///< 装甲板尺寸（像素）
+    double confidence;      ///< 检测置信度，范围 [0, 1]
+    int id;                 ///< 装甲板编号（1-5 对应英雄到哨兵）
+    TargetColor color;      ///< 装甲板颜色
+};
+```
+
+配置和运行 Doxygen 非常简单。首先安装 Doxygen：
+
+```bash
+sudo apt install doxygen graphviz
+```
+
+然后在项目根目录生成配置文件：
+
+```bash
+doxygen -g Doxyfile
+```
+
+编辑 `Doxyfile` 配置主要选项：
+
+```
+# 项目信息
+PROJECT_NAME           = "RoboMaster Vision"
+PROJECT_NUMBER         = 2.0.0
+PROJECT_BRIEF          = "自瞄视觉系统"
+
+# 输入设置
+INPUT                  = include src
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.hpp *.cpp
+
+# 输出设置
+OUTPUT_DIRECTORY       = docs/api
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+
+# 提取设置
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+# 图表
+HAVE_DOT               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+```
+
+运行 Doxygen 生成文档：
+
+```bash
+doxygen Doxyfile
+```
+
+生成的 HTML 文档在 `docs/api/html/` 目录下，用浏览器打开 `index.html` 即可查看。
+
+==== 项目文档类型
+
+除了代码中的注释和 API 文档，一个完整的项目还需要其他类型的文档。不同文档面向不同的读者、服务于不同的目的。
+
+需求文档描述系统应该做什么。它定义功能需求（系统应该具备什么功能）和非功能需求（性能、可靠性、可维护性等要求）。需求文档是开发的起点，所有后续工作都是为了满足需求。在 RoboMaster 中，需求可能包括：检测精度要达到多少、延迟不能超过多少毫秒、要支持哪些目标类型等。
+
+```markdown
+# 自瞄系统需求文档
+
+## 功能需求
+
+### FR-001: 装甲板检测
+- 系统应能检测红色和蓝色装甲板
+- 支持识别装甲板编号（1-5）
+- 检测距离范围：1-8 米
+
+### FR-002: 目标跟踪
+- 系统应能跟踪多个目标
+- 支持目标遮挡后重新识别
+- 跟踪 ID 应保持稳定
+
+## 非功能需求
+
+### NFR-001: 性能
+- 端到端延迟 < 20ms
+- 检测帧率 >= 60 FPS
+
+### NFR-002: 可靠性
+- 误检率 < 1%
+- 连续运行 8 小时无崩溃
+```
+
+设计文档描述系统如何实现需求。它包括系统架构、模块划分、接口定义、数据流、关键算法等。设计文档是开发者的蓝图，帮助团队成员理解系统的整体结构和设计决策。好的设计文档不仅说明"怎么做"，还要解释"为什么这么做"。
+
+```markdown
+# 自瞄系统设计文档
+
+## 系统架构
+
+系统采用三层架构：感知层、决策层、执行层。
+
+```
+┌─────────────┐
+│   感知层    │  ← 图像采集、目标检测、状态估计
+├─────────────┤
+│   决策层    │  ← 目标选择、弹道解算、预测补偿
+├─────────────┤
+│   执行层    │  ← 云台控制、发射控制
+└─────────────┘
+```
+
+## 模块设计
+
+### 检测模块
+
+采用 YOLOv8 进行装甲板检测，原因：
+1. 速度快，满足实时性要求
+2. 准确率高，尤其对小目标
+3. 社区支持好，便于优化
+
+### 跟踪模块
+
+采用 EKF 进行状态估计，状态向量：
+- 位置 (x, y, z)
+- 速度 (vx, vy, vz)
+- 装甲板朝向 θ
+
+## 接口定义
+
+...
+```
+
+用户手册面向最终用户，说明如何安装、配置和使用系统。它应该假设读者不了解内部实现，用清晰的语言和步骤指导用户完成任务。对于 RoboMaster 项目，用户可能是操作手或调试人员。
+
+变更日志（CHANGELOG）记录项目的版本历史和每个版本的变化。它帮助用户了解版本之间的差异，决定是否升级，以及升级时需要注意什么。一个常见的格式是 Keep a Changelog：
+
+```markdown
+# 变更日志
+
+本项目遵循 [语义化版本](https://semver.org/)。
+
+## [2.1.0] - 2024-03-15
+
+### 新增
+- 支持能量机关检测
+- 添加录像回放功能
+
+### 变更
+- 升级 YOLOv8 模型，检测速度提升 20%
+- 调整默认参数，适配新赛季规则
+
+### 修复
+- 修复在强光下的误检问题 (#42)
+- 修复内存泄漏 (#45)
+
+### 废弃
+- `DetectArmor()` 已废弃，请使用 `Detect()`
+
+## [2.0.0] - 2024-01-10
+
+### 破坏性变更
+- 重构检测接口，不兼容 1.x 版本
+- 配置文件格式改为 YAML
+
+...
+```
+
+==== Markdown 写作技巧
+
+Markdown 是最流行的文档格式之一，几乎所有的代码托管平台都支持它。掌握 Markdown 的写作技巧可以让你的文档更清晰、更易读。
+
+结构化是好文档的基础。使用标题建立层次结构，让读者能够快速把握文档的脉络。但不要过度嵌套——三级标题通常就足够了，更深的层次可能意味着文档需要拆分。
+
+```markdown
+# 一级标题（文档标题）
+## 二级标题（主要章节）
+### 三级标题（子章节）
+```
+
+列表用于并列的内容。有序列表用于有顺序的步骤，无序列表用于没有顺序的项目。列表项应该结构一致——要么都是完整的句子，要么都是短语。
+
+```markdown
+## 安装步骤
+
+1. 克隆仓库
+2. 安装依赖
+3. 编译项目
+4. 运行测试
+
+## 支持的功能
+
+- 装甲板检测
+- 能量机关检测
+- 目标跟踪
+```
+
+代码块是技术文档的重要组成部分。始终指定语言以获得语法高亮，使用行内代码标记命令、函数名、文件名等。
+
+```markdown
+运行 `ros2 launch` 启动节点：
+
+```bash
+ros2 launch rm_vision detector.launch.py
+```
+
+函数 `Detect()` 返回检测结果。
+```
+
+表格适合展示结构化的对比信息。保持表格简洁，复杂的内容应该用其他方式呈现。
+
+```markdown
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| confidence_threshold | float | 0.7 | 置信度阈值 |
+| nms_threshold | float | 0.4 | NMS 阈值 |
+| target_color | string | "red" | 目标颜色 |
+```
+
+图片和图表可以大大提高文档的可理解性。系统架构图、流程图、效果截图都是有价值的。使用 Mermaid 可以在 Markdown 中直接编写图表：
+
+````markdown
+```mermaid
+graph LR
+    A[相机] --> B[检测器]
+    B --> C[跟踪器]
+    C --> D[预测器]
+    D --> E[云台控制]
+```
+````
+
+链接让文档形成网络。使用相对链接引用项目内的其他文档，使用外部链接引用参考资料。但不要过度链接——每个链接都是一个潜在的离开当前上下文的机会。
+
+```markdown
+详细配置说明请参阅 [配置文档](./config.md)。
+
+算法原理基于这篇 [论文](https://arxiv.org/abs/xxx)。
+```
+
+==== 文档即代码
+
+"文档即代码"（Docs as Code）是一种现代的文档管理理念：将文档视为代码一样对待，使用相同的工具和流程来管理。
+
+首先，文档应该纳入版本控制。将文档与代码放在同一个仓库中，使用 Git 追踪变更历史。这样可以保证文档与代码的版本对应，也可以回溯历史版本。代码审查流程也应该包括文档——修改代码时，检查相关文档是否需要更新。
+
+其次，文档应该使用纯文本格式。Markdown、reStructuredText、AsciiDoc 等格式易于编辑、易于比较差异、易于自动处理。避免使用 Word 等二进制格式，它们难以进行版本控制和协作编辑。
+
+第三，可以利用 CI/CD 自动化文档流程。代码推送时自动构建文档、检查链接、部署到网站。这样可以保证文档始终是最新的，也可以在问题出现时及早发现。
+
+```yaml
+# .github/workflows/docs.yml
+name: Build Documentation
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Doxygen
+        run: doxygen Doxyfile
+        
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/api/html
+```
+
+最后，鼓励团队成员贡献文档。降低贡献门槛——使用简单的格式、提供模板、及时审查 PR。将文档贡献视为与代码贡献同等重要的工作。
+
+==== RoboMaster 文档实践
+
+结合 RoboMaster 的实际情况，以下是一些具体的文档实践建议。
+
+赛季交接文档是 RoboMaster 团队最重要的文档之一。每年赛季结束后，核心队员应该编写详细的交接文档，包括：系统整体架构和设计思路、各模块的功能和接口、调试经验和已知问题、本赛季的改进和遗留问题、对下赛季的建议。这份文档将成为新队员的入门指南，也是团队知识积累的载体。
+
+```markdown
+# 2024 赛季自瞄系统交接文档
+
+## 系统概述
+
+本赛季自瞄系统采用 YOLOv8 + EKF 架构...
+
+## 取得的成果
+
+- 检测帧率从 30 FPS 提升到 60 FPS
+- 命中率从 60% 提升到 80%
+- 支持了能量机关检测
+
+## 遗留问题
+
+1. 强光下仍有误检（建议添加时域滤波）
+2. 远距离检测精度不足（建议尝试更大的模型）
+3. 代码耦合度高（建议重构跟踪模块）
+
+## 下赛季建议
+
+- 考虑使用 Transformer 架构
+- 完善单元测试覆盖
+- 整理代码规范
+```
+
+硬件接口文档对于软硬件协作至关重要。它应该详细描述通信协议、数据格式、引脚定义、时序要求等。当软件组和电控组需要对接时，这份文档可以避免大量的沟通成本。
+
+````markdown
+# 视觉-电控通信协议
+
+## 物理接口
+
+- 接口类型：UART
+- 波特率：115200
+- 数据位：8
+- 停止位：1
+- 校验：无
+
+## 数据帧格式
+
+| 字节 | 内容 | 说明 |
+|------|------|------|
+| 0 | 0xA5 | 帧头 |
+| 1 | len | 数据长度 |
+| 2 | seq | 帧序号 |
+| 3 | crc8 | 头部校验 |
+| 4-N | data | 数据内容 |
+| N+1,N+2 | crc16 | 整帧校验 |
+
+## 命令定义
+
+### 0x01: 自瞄数据
+
+```c
+struct AimData {
+    float yaw;      // 目标 yaw 角度，单位：度
+    float pitch;    // 目标 pitch 角度，单位：度
+    uint8_t fire;   // 是否开火：0-否，1-是
+};
+```
+````
+
+调试手册记录常见问题的诊断和解决方法。比赛现场时间紧迫，一份好的调试手册可以帮助快速定位和解决问题。
+
+```markdown
+# 自瞄系统调试手册
+
+## 问题：检测不到目标
+
+### 可能原因
+
+1. 相机未正确连接
+2. 曝光参数不合适
+3. 目标颜色设置错误
+
+### 诊断步骤
+
+1. 检查相机是否被识别：`ls /dev/video*`
+2. 查看原始图像：`ros2 run rqt_image_view rqt_image_view`
+3. 检查配置文件中的 `target_color` 设置
+
+### 解决方案
+
+1. 重新插拔相机，检查 USB 连接
+2. 使用 `scripts/auto_exposure.py` 自动调整曝光
+3. 修改 `config/detector.yaml` 中的颜色设置
+
+## 问题：云台抖动
+
+...
+```
+
+文档不是写完就结束的一次性工作，而是需要持续维护的活文档。每次代码修改、问题解决、经验总结，都应该反映到文档中。将文档更新作为开发流程的一部分，而不是事后的补充工作。团队可以建立这样的规范：每个 PR 如果涉及接口变更，必须同时更新相关文档；每次调试解决的问题，都要记录到调试手册中；每个赛季结束，必须完成交接文档。
+
+文档是软件工程中经常被忽视但极其重要的一环。它是代码与人之间的桥梁，是知识传承的载体，是团队协作的基础。花在文档上的时间不是浪费，而是对未来的投资。当你写文档时，想象一下几个月后的自己、刚加入团队的新人、或者在比赛现场焦急调试的队友——你写下的每一个字，都可能在某个时刻帮助到他们。
+
+
+=== 版本控制与协作（可选/扩展）
+// Git 工作流与团队协作
+// - Git 基础回顾
+// - 分支策略：Git Flow vs GitHub Flow
+// - 提交信息规范（Conventional Commits）
+// - Pull Request 与 Code Review
+// - CI/CD 简介
+// - 冲突解决
+// - RoboMaster 团队 Git 实践
