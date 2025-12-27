@@ -716,6 +716,751 @@ robomaster_project/
 //   算法模块的单元测试
 //   通信协议的测试
 //   仿真环境的价值
+// === 单元测试
+
+"它在我的机器上能跑啊！"——这可能是程序员最常说的一句话，也是最让人无奈的一句话。代码能运行并不意味着代码是正确的。你今天写的代码明天还能正常工作吗？修改了一个函数，会不会破坏其他地方的功能？重构了一个模块，原来的行为还保持不变吗？如果没有测试，你只能祈祷和手动验证。而有了测试，你可以在几秒钟内得到确切的答案。单元测试是程序员给自己买的保险——平时花一点时间编写，关键时刻能省下无数调试的痛苦。
+
+==== 为什么要写测试
+
+测试最直接的价值是验证代码的正确性。当你写完一个函数，如何确认它真的按预期工作？你可能会写一个 `main` 函数，手动调用几次，看看输出对不对。这种方法能解决眼前的问题，但一旦代码发生变化，你又得重新手动验证。如果有十个函数需要验证，每次修改都要手动测试一遍，这个负担会越来越重，最终你会放弃验证，只能"希望"代码是对的。
+
+自动化测试解决了这个问题。测试代码被保存下来，可以反复执行。每次修改代码后，只需运行一下测试，几秒钟就能知道是否破坏了什么。这种即时反馈让你可以放心地修改代码，而不是战战兢兢地担心引入 bug。在 RoboMaster 开发中，算法经常需要调优参数、改进逻辑，如果没有测试保障，每次修改都是在冒险。
+
+测试的另一个重要价值是支撑重构。随着项目演进，最初的设计可能不再适用，代码需要重构以保持健康。但重构是危险的——你要在不改变外部行为的前提下改变内部结构，如何确保"外部行为不变"？答案就是测试。如果有充分的测试覆盖，重构后运行测试全部通过，你就可以确信重构没有引入问题。没有测试的代码几乎不可能安全地重构，最终只能任其腐烂，直到不得不重写。
+
+测试还能作为可执行的文档。好的测试用例清晰地展示了代码的使用方式和预期行为，比文字描述更加精确。当你不确定一个函数该怎么用时，看看它的测试用例往往能得到答案。测试用例也不会过时——如果测试与代码行为不符，测试就会失败，迫使你更新。
+
+有些团队会说"我们没时间写测试"，但这是一个短视的观点。不写测试确实能节省一些时间，但这些时间迟早会以调试 bug 的形式还回来，而且往往是加倍偿还。一个隐蔽的 bug 可能在比赛现场暴露，导致整场比赛的失利；一个没有测试保护的修改可能引发连锁反应，花费数小时才能定位。测试不是额外的负担，而是提高开发效率的投资。
+
+==== 测试金字塔
+
+软件测试有多种类型，它们在测试范围、执行速度和维护成本上有所不同。测试金字塔是一个经典的模型，它描述了不同类型测试应有的比例。
+
+单元测试位于金字塔的底层，数量最多。单元测试针对代码的最小可测试单元——通常是一个函数或一个类——验证其行为是否正确。单元测试应该快速（毫秒级）、独立（不依赖外部资源）、可重复（每次运行结果相同）。一个典型的项目可能有成百上千个单元测试，它们在每次代码提交时运行，提供快速反馈。
+
+```
+          /\
+         /  \         端到端测试
+        /----\        （少量，慢，昂贵）
+       /      \
+      /--------\      集成测试
+     /          \     （适量，中等速度）
+    /------------\
+   /              \   单元测试
+  /----------------\  （大量，快速，便宜）
+```
+
+集成测试位于金字塔的中层。它测试多个模块组合在一起是否能正确协作。例如，测试视觉检测模块与跟踪模块的接口是否匹配，测试通信模块能否正确解析实际的数据包。集成测试比单元测试慢，因为涉及更多的代码和可能的外部资源，但它能发现单元测试无法发现的集成问题。
+
+端到端测试（也叫系统测试）位于金字塔的顶层，数量最少。它测试整个系统作为一个整体是否能完成用户场景。对于 RoboMaster 机器人，端到端测试可能是在仿真环境中运行完整的自瞄流程，从图像输入到云台控制输出。端到端测试最接近真实使用场景，但也最慢、最难维护。
+
+金字塔形状表示了推荐的测试比例：大量的单元测试、适量的集成测试、少量的端到端测试。这样的比例既能保证测试覆盖，又能保持测试的执行效率。如果你的测试金字塔是倒过来的（大量端到端测试、少量单元测试），测试运行会很慢，问题定位会很困难，测试也会很脆弱。
+
+本节主要关注单元测试。单元测试是最基础也是最重要的测试类型，它是测试金字塔的基石。
+
+==== Google Test 框架入门
+
+Google Test（简称 gtest）是 C++ 社区最流行的单元测试框架。它由 Google 开发并开源，提供了丰富的断言、测试组织和运行功能。许多知名项目都使用 gtest，包括 Chromium、LLVM、OpenCV 等。
+
+安装 gtest 在 Ubuntu 上非常简单：
+
+```bash
+sudo apt install libgtest-dev
+```
+
+在 CMake 项目中使用 gtest，需要在 CMakeLists.txt 中添加相应配置：
+
+```cmake
+cmake_minimum_required(VERSION 3.14)
+project(my_project)
+
+# 启用测试
+enable_testing()
+
+# 查找 GTest
+find_package(GTest REQUIRED)
+
+# 添加可执行文件
+add_executable(my_tests
+    test/test_main.cpp
+    test/test_math_utils.cpp
+    test/test_detector.cpp
+)
+
+# 链接 GTest
+target_link_libraries(my_tests
+    GTest::gtest
+    GTest::gtest_main
+    my_library  # 被测试的库
+)
+
+# 注册测试
+include(GoogleTest)
+gtest_discover_tests(my_tests)
+```
+
+如果使用 `GTest::gtest_main`，gtest 会提供 `main` 函数，你不需要自己写。否则，需要在测试文件中添加：
+
+```cpp
+#include <gtest/gtest.h>
+
+int main(int argc, char** argv) {
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
+```
+
+编写第一个测试非常简单。使用 `TEST` 宏定义一个测试用例，第一个参数是测试套件名，第二个参数是测试名：
+
+```cpp
+#include <gtest/gtest.h>
+#include "math_utils.h"
+
+// 测试套件：MathUtils，测试名：AddPositiveNumbers
+TEST(MathUtils, AddPositiveNumbers) {
+    EXPECT_EQ(Add(1, 2), 3);
+    EXPECT_EQ(Add(10, 20), 30);
+}
+
+TEST(MathUtils, AddNegativeNumbers) {
+    EXPECT_EQ(Add(-1, -2), -3);
+    EXPECT_EQ(Add(-10, 20), 10);
+}
+
+TEST(MathUtils, AddZero) {
+    EXPECT_EQ(Add(0, 0), 0);
+    EXPECT_EQ(Add(5, 0), 5);
+    EXPECT_EQ(Add(0, 5), 5);
+}
+```
+
+运行测试：
+
+```bash
+# 构建
+mkdir build && cd build
+cmake ..
+make
+
+# 运行所有测试
+./my_tests
+
+# 运行特定测试套件
+./my_tests --gtest_filter=MathUtils.*
+
+# 运行特定测试
+./my_tests --gtest_filter=MathUtils.AddPositiveNumbers
+```
+
+测试输出会显示每个测试的结果：
+
+```
+[==========] Running 3 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 3 tests from MathUtils
+[ RUN      ] MathUtils.AddPositiveNumbers
+[       OK ] MathUtils.AddPositiveNumbers (0 ms)
+[ RUN      ] MathUtils.AddNegativeNumbers
+[       OK ] MathUtils.AddNegativeNumbers (0 ms)
+[ RUN      ] MathUtils.AddZero
+[       OK ] MathUtils.AddZero (0 ms)
+[----------] 3 tests from MathUtils (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 3 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 3 tests.
+```
+
+==== 断言：EXPECT 与 ASSERT
+
+gtest 提供了丰富的断言宏来验证条件。断言分为两类：`EXPECT_*` 和 `ASSERT_*`。两者的区别在于失败后的行为：`EXPECT_*` 失败后会继续执行后续的断言，而 `ASSERT_*` 失败后会立即终止当前测试。
+
+一般情况下优先使用 `EXPECT_*`，这样一次运行可以发现多个问题。当后续断言依赖于前面的条件成立时（比如指针非空），使用 `ASSERT_*` 避免后续代码崩溃。
+
+```cpp
+TEST(VectorTest, AccessElements) {
+    std::vector<int> v;
+    v.push_back(1);
+    v.push_back(2);
+    
+    // 使用 ASSERT 检查前提条件
+    ASSERT_FALSE(v.empty());  // 如果失败，后续代码不安全
+    ASSERT_EQ(v.size(), 2);
+    
+    // 使用 EXPECT 检查具体值
+    EXPECT_EQ(v[0], 1);
+    EXPECT_EQ(v[1], 2);
+}
+```
+
+常用的断言宏包括：
+
+```cpp
+// 布尔断言
+EXPECT_TRUE(condition);
+EXPECT_FALSE(condition);
+
+// 相等性断言
+EXPECT_EQ(expected, actual);  // expected == actual
+EXPECT_NE(val1, val2);        // val1 != val2
+
+// 比较断言
+EXPECT_LT(val1, val2);        // val1 < val2
+EXPECT_LE(val1, val2);        // val1 <= val2
+EXPECT_GT(val1, val2);        // val1 > val2
+EXPECT_GE(val1, val2);        // val1 >= val2
+
+// 浮点数断言（考虑精度误差）
+EXPECT_FLOAT_EQ(expected, actual);   // float 相等
+EXPECT_DOUBLE_EQ(expected, actual);  // double 相等
+EXPECT_NEAR(val1, val2, tolerance);  // 差值在容差内
+
+// 字符串断言
+EXPECT_STREQ(str1, str2);     // C 字符串相等
+EXPECT_STRNE(str1, str2);     // C 字符串不等
+
+// 异常断言
+EXPECT_THROW(statement, exception_type);  // 抛出指定异常
+EXPECT_ANY_THROW(statement);              // 抛出任何异常
+EXPECT_NO_THROW(statement);               // 不抛出异常
+
+// 自定义失败消息
+EXPECT_EQ(result, expected) << "计算结果不正确，输入为: " << input;
+```
+
+对于浮点数比较，永远不要使用 `EXPECT_EQ`，因为浮点数计算存在精度误差。使用 `EXPECT_FLOAT_EQ`、`EXPECT_DOUBLE_EQ` 或 `EXPECT_NEAR`：
+
+```cpp
+TEST(FloatTest, Precision) {
+    double result = 0.1 + 0.2;
+    
+    // 不好：可能因精度问题失败
+    // EXPECT_EQ(result, 0.3);
+    
+    // 好：考虑浮点精度
+    EXPECT_DOUBLE_EQ(result, 0.3);
+    EXPECT_NEAR(result, 0.3, 1e-10);
+}
+```
+
+==== 测试夹具
+
+当多个测试需要相同的初始化代码时，可以使用测试夹具（Test Fixture）来避免重复。测试夹具是一个继承自 `testing::Test` 的类，在 `SetUp()` 方法中进行初始化，在 `TearDown()` 方法中进行清理。
+
+```cpp
+#include <gtest/gtest.h>
+#include "detector.h"
+
+class DetectorTest : public testing::Test {
+protected:
+    void SetUp() override {
+        // 每个测试前执行
+        config_.model_path = "test_model.onnx";
+        config_.confidence_threshold = 0.5;
+        detector_ = std::make_unique<ArmorDetector>(config_);
+        detector_->Init();
+        
+        // 加载测试图像
+        test_image_ = cv::imread("test_data/armor_image.jpg");
+    }
+    
+    void TearDown() override {
+        // 每个测试后执行（可选）
+        detector_.reset();
+    }
+    
+    // 测试中可以使用的成员
+    DetectorConfig config_;
+    std::unique_ptr<ArmorDetector> detector_;
+    cv::Mat test_image_;
+};
+
+// 使用 TEST_F 而不是 TEST
+TEST_F(DetectorTest, DetectsArmorInTestImage) {
+    auto results = detector_->Detect(test_image_);
+    EXPECT_FALSE(results.empty());
+}
+
+TEST_F(DetectorTest, ReturnsEmptyForBlankImage) {
+    cv::Mat blank(480, 640, CV_8UC3, cv::Scalar(0, 0, 0));
+    auto results = detector_->Detect(blank);
+    EXPECT_TRUE(results.empty());
+}
+
+TEST_F(DetectorTest, ConfidenceAboveThreshold) {
+    auto results = detector_->Detect(test_image_);
+    for (const auto& armor : results) {
+        EXPECT_GE(armor.confidence, config_.confidence_threshold);
+    }
+}
+```
+
+测试夹具的执行顺序是：构造函数 → `SetUp()` → 测试体 → `TearDown()` → 析构函数。每个测试都会创建一个新的夹具实例，所以测试之间是隔离的。
+
+如果多个测试套件需要共享更昂贵的初始化（比如加载大型模型），可以使用 `SetUpTestSuite()` 和 `TearDownTestSuite()` 静态方法，它们只在整个测试套件前后各执行一次：
+
+```cpp
+class ExpensiveTest : public testing::Test {
+protected:
+    static void SetUpTestSuite() {
+        // 整个测试套件只执行一次
+        shared_model_ = LoadLargeModel();
+    }
+    
+    static void TearDownTestSuite() {
+        shared_model_.reset();
+    }
+    
+    static std::shared_ptr<Model> shared_model_;
+};
+
+std::shared_ptr<Model> ExpensiveTest::shared_model_;
+```
+
+==== 参数化测试
+
+当你需要用不同的输入测试同一个逻辑时，参数化测试可以避免编写大量重复的测试代码。
+
+```cpp
+#include <gtest/gtest.h>
+
+// 定义参数类型
+struct AngleTestParam {
+    double input_degrees;
+    double expected_radians;
+};
+
+// 参数化测试夹具
+class AngleConversionTest : public testing::TestWithParam<AngleTestParam> {};
+
+// 参数化测试
+TEST_P(AngleConversionTest, DegreesToRadians) {
+    AngleTestParam param = GetParam();
+    double result = DegreesToRadians(param.input_degrees);
+    EXPECT_NEAR(result, param.expected_radians, 1e-6);
+}
+
+// 提供测试参数
+INSTANTIATE_TEST_SUITE_P(
+    CommonAngles,
+    AngleConversionTest,
+    testing::Values(
+        AngleTestParam{0, 0},
+        AngleTestParam{90, M_PI / 2},
+        AngleTestParam{180, M_PI},
+        AngleTestParam{360, 2 * M_PI},
+        AngleTestParam{-90, -M_PI / 2}
+    )
+);
+```
+
+对于简单类型，可以使用更简洁的写法：
+
+```cpp
+class PrimeTest : public testing::TestWithParam<int> {};
+
+TEST_P(PrimeTest, IsPrime) {
+    int n = GetParam();
+    EXPECT_TRUE(IsPrime(n));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Primes,
+    PrimeTest,
+    testing::Values(2, 3, 5, 7, 11, 13, 17, 19)
+);
+```
+
+`testing::Values` 之外还有其他参数生成器：
+
+```cpp
+// 范围
+testing::Range(start, end, step);
+
+// 布尔值
+testing::Bool();  // true, false
+
+// 组合
+testing::Combine(testing::Values(1, 2), testing::Values("a", "b"));
+// 生成 (1, "a"), (1, "b"), (2, "a"), (2, "b")
+```
+
+==== 测试驱动开发
+
+测试驱动开发（Test-Driven Development，TDD）是一种先写测试、后写实现的开发方法。它遵循"红-绿-重构"的循环：
+
+1. **红**：先写一个会失败的测试，明确你要实现什么功能
+2. **绿**：写最少的代码让测试通过
+3. **重构**：在测试保护下改进代码结构
+
+```cpp
+// 第一步：写一个失败的测试
+TEST(Calculator, Add) {
+    Calculator calc;
+    EXPECT_EQ(calc.Add(2, 3), 5);
+}
+
+// 此时编译失败，因为 Calculator 类不存在
+
+// 第二步：写最少的代码让测试通过
+class Calculator {
+public:
+    int Add(int a, int b) {
+        return a + b;  // 最简单的实现
+    }
+};
+
+// 测试通过
+
+// 第三步：重构（如果需要）
+// 当前实现已经足够简单，无需重构
+
+// 继续循环：添加更多测试
+TEST(Calculator, Subtract) {
+    Calculator calc;
+    EXPECT_EQ(calc.Subtract(5, 3), 2);
+}
+
+// 然后实现 Subtract...
+```
+
+TDD 的好处是：
+
+首先，它确保代码总是可测试的。因为测试先于实现编写，你不会写出难以测试的代码。
+
+其次，它迫使你在编码前思考接口设计。写测试时你就在思考：这个函数应该接收什么参数？返回什么结果？这种思考往往能产生更好的设计。
+
+第三，它提供了即时反馈。每次实现一小块功能，马上就能验证是否正确，而不是写完一大堆代码再调试。
+
+TDD 并不适合所有场景。对于探索性的代码、需求不明确的原型、或者 GUI 相关的代码，TDD 可能不太合适。但对于逻辑明确的算法、工具函数、数据处理模块，TDD 是非常有效的方法。
+
+==== 什么样的代码容易测试
+
+有些代码很容易测试，有些代码测试起来非常痛苦。理解什么样的代码容易测试，可以指导你写出更好的代码设计。
+
+纯函数最容易测试。纯函数的输出只依赖于输入，没有副作用，不依赖外部状态。给定相同的输入，总是产生相同的输出。这样的函数测试起来非常简单：准备输入，调用函数，检查输出。
+
+```cpp
+// 容易测试：纯函数
+double CalculateDistance(const Point& a, const Point& b) {
+    return std::sqrt(std::pow(a.x - b.x, 2) + std::pow(a.y - b.y, 2));
+}
+
+TEST(Geometry, CalculateDistance) {
+    Point a{0, 0};
+    Point b{3, 4};
+    EXPECT_DOUBLE_EQ(CalculateDistance(a, b), 5.0);
+}
+```
+
+依赖注入让代码更容易测试。如果一个类在内部创建它的依赖，测试时就很难替换这些依赖。但如果依赖是从外部传入的，测试时就可以传入模拟的依赖。
+
+```cpp
+// 难以测试：内部创建依赖
+class Tracker {
+public:
+    void Update() {
+        Camera camera;  // 内部创建，无法替换
+        auto image = camera.Capture();
+        // ...
+    }
+};
+
+// 容易测试：依赖注入
+class Tracker {
+public:
+    explicit Tracker(std::shared_ptr<ICamera> camera) 
+        : camera_(camera) {}
+    
+    void Update() {
+        auto image = camera_->Capture();  // 可以注入模拟相机
+        // ...
+    }
+
+private:
+    std::shared_ptr<ICamera> camera_;
+};
+
+// 测试时使用模拟相机
+class MockCamera : public ICamera {
+public:
+    cv::Mat Capture() override {
+        return test_image_;  // 返回预设的测试图像
+    }
+    cv::Mat test_image_;
+};
+
+TEST(Tracker, UpdateWithMockCamera) {
+    auto mock_camera = std::make_shared<MockCamera>();
+    mock_camera->test_image_ = cv::imread("test_image.jpg");
+    
+    Tracker tracker(mock_camera);
+    tracker.Update();
+    // 验证结果...
+}
+```
+
+小函数比大函数容易测试。一个做很多事情的大函数，需要准备很多前置条件，验证很多结果，测试用例会很复杂。把大函数拆成多个小函数，每个小函数单独测试，会简单得多。
+
+避免全局状态。依赖全局变量或单例的代码难以测试，因为测试之间会相互影响。如果必须使用，至少提供重置状态的方法。
+
+==== Mock 与依赖注入
+
+当被测代码依赖外部资源（数据库、网络、硬件）时，直接使用真实依赖会让测试变慢、变脆弱、变得不可重复。Mock（模拟对象）是解决这个问题的标准方法。
+
+Google Mock（现在是 gtest 的一部分）提供了创建 Mock 对象的便捷方式：
+
+```cpp
+#include <gmock/gmock.h>
+
+// 定义接口
+class ISerial {
+public:
+    virtual ~ISerial() = default;
+    virtual bool Open(const std::string& port) = 0;
+    virtual bool Write(const std::vector<uint8_t>& data) = 0;
+    virtual std::vector<uint8_t> Read(size_t size) = 0;
+};
+
+// 创建 Mock 类
+class MockSerial : public ISerial {
+public:
+    MOCK_METHOD(bool, Open, (const std::string& port), (override));
+    MOCK_METHOD(bool, Write, (const std::vector<uint8_t>& data), (override));
+    MOCK_METHOD(std::vector<uint8_t>, Read, (size_t size), (override));
+};
+
+// 使用 Mock 测试
+TEST(Communication, SendCommand) {
+    MockSerial mock_serial;
+    
+    // 设置期望：Open 被调用一次，返回 true
+    EXPECT_CALL(mock_serial, Open("/dev/ttyUSB0"))
+        .Times(1)
+        .WillOnce(testing::Return(true));
+    
+    // 设置期望：Write 被调用，参数匹配，返回 true
+    EXPECT_CALL(mock_serial, Write(testing::_))
+        .Times(1)
+        .WillOnce(testing::Return(true));
+    
+    // 被测对象使用 Mock
+    Commander commander(&mock_serial);
+    bool result = commander.SendAimCommand(1.5, 2.0);
+    
+    EXPECT_TRUE(result);
+    // Mock 会自动验证期望是否被满足
+}
+```
+
+GMock 提供了丰富的匹配器和动作：
+
+```cpp
+using namespace testing;
+
+// 匹配器
+EXPECT_CALL(mock, Method(Eq(5)));        // 参数等于 5
+EXPECT_CALL(mock, Method(Gt(0)));        // 参数大于 0
+EXPECT_CALL(mock, Method(_));            // 任意参数
+EXPECT_CALL(mock, Method(StartsWith("prefix")));  // 字符串前缀
+
+// 调用次数
+EXPECT_CALL(mock, Method(_)).Times(3);           // 恰好 3 次
+EXPECT_CALL(mock, Method(_)).Times(AtLeast(1));  // 至少 1 次
+EXPECT_CALL(mock, Method(_)).Times(AtMost(5));   // 至多 5 次
+
+// 返回值
+EXPECT_CALL(mock, Method(_)).WillOnce(Return(42));
+EXPECT_CALL(mock, Method(_)).WillRepeatedly(Return(0));
+
+// 按顺序
+{
+    InSequence seq;
+    EXPECT_CALL(mock, First());
+    EXPECT_CALL(mock, Second());
+    EXPECT_CALL(mock, Third());
+}
+```
+
+依赖注入是使 Mock 成为可能的设计模式。核心思想是：类不应该自己创建依赖，而应该从外部接收依赖。这有几种实现方式：
+
+构造函数注入是最常用的方式：
+
+```cpp
+class AutoAim {
+public:
+    AutoAim(std::shared_ptr<IDetector> detector,
+            std::shared_ptr<ITracker> tracker,
+            std::shared_ptr<IPredictor> predictor)
+        : detector_(detector), tracker_(tracker), predictor_(predictor) {}
+    
+    // ...
+
+private:
+    std::shared_ptr<IDetector> detector_;
+    std::shared_ptr<ITracker> tracker_;
+    std::shared_ptr<IPredictor> predictor_;
+};
+```
+
+Setter 注入适合可选依赖：
+
+```cpp
+class Logger {
+public:
+    void SetOutput(std::shared_ptr<IOutput> output) {
+        output_ = output;
+    }
+    
+    // ...
+};
+```
+
+==== 测试覆盖率
+
+测试覆盖率衡量测试执行了多少代码。常见的覆盖率指标包括：
+
+- **行覆盖率**：执行了多少行代码
+- **分支覆盖率**：执行了多少分支（if/else 的每个分支）
+- **函数覆盖率**：调用了多少函数
+
+使用 gcov/lcov 可以生成覆盖率报告：
+
+```bash
+# 编译时启用覆盖率
+g++ -fprofile-arcs -ftest-coverage -o my_tests my_tests.cpp my_code.cpp
+
+# 运行测试
+./my_tests
+
+# 生成报告
+lcov --capture --directory . --output-file coverage.info
+genhtml coverage.info --output-directory coverage_report
+
+# 在浏览器中查看
+xdg-open coverage_report/index.html
+```
+
+CMake 配置：
+
+```cmake
+option(ENABLE_COVERAGE "Enable coverage reporting" OFF)
+
+if(ENABLE_COVERAGE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
+endif()
+```
+
+覆盖率是有用的指标，但不要过度追求。100% 覆盖率并不意味着代码没有 bug——测试可能覆盖了代码但没有检查正确的条件。更重要的是测试的质量而非数量。一般来说，核心逻辑应该有较高的覆盖率（80% 以上），而 UI、胶水代码等可以低一些。
+
+==== RoboMaster 中的测试实践
+
+在 RoboMaster 项目中，测试应该聚焦于核心算法和关键逻辑。以下是一些具体的建议。
+
+算法模块是最应该测试的部分。检测算法、跟踪算法、预测算法、弹道解算——这些模块逻辑复杂、容易出错，而且相对独立，很适合单元测试。
+
+```cpp
+// 弹道解算测试
+class BallisticSolverTest : public testing::Test {
+protected:
+    void SetUp() override {
+        solver_ = std::make_unique<BallisticSolver>(28.0);  // 28 m/s 弹速
+    }
+    
+    std::unique_ptr<BallisticSolver> solver_;
+};
+
+TEST_F(BallisticSolverTest, HorizontalTarget) {
+    // 水平目标，不需要补偿
+    double pitch = solver_->Solve(5.0, 0.0);  // 5米远，高度差为0
+    EXPECT_NEAR(pitch, 0.0, 0.01);  // 接近水平
+}
+
+TEST_F(BallisticSolverTest, ElevatedTarget) {
+    // 高处目标，需要向上补偿
+    double pitch = solver_->Solve(5.0, 2.0);  // 5米远，高2米
+    EXPECT_GT(pitch, 0.0);  // 仰角应该为正
+}
+
+TEST_F(BallisticSolverTest, DistanceAffectsDrop) {
+    // 距离越远，下坠补偿越大
+    double pitch_near = solver_->Solve(3.0, 0.0);
+    double pitch_far = solver_->Solve(8.0, 0.0);
+    EXPECT_GT(pitch_far, pitch_near);
+}
+```
+
+通信协议测试确保数据包的打包和解析正确：
+
+```cpp
+class ProtocolTest : public testing::Test {
+protected:
+    Protocol protocol_;
+};
+
+TEST_F(ProtocolTest, PackAimCommand) {
+    AimCommand cmd{1.5f, -0.3f, true};
+    auto packet = protocol_.Pack(cmd);
+    
+    EXPECT_EQ(packet.size(), Protocol::kAimCommandSize);
+    EXPECT_EQ(packet[0], Protocol::kHeader);
+    EXPECT_EQ(packet[1], Protocol::kAimCommandId);
+}
+
+TEST_F(ProtocolTest, UnpackAimCommand) {
+    std::vector<uint8_t> packet = {0xA5, 0x01, /* ... */};
+    auto cmd = protocol_.Unpack<AimCommand>(packet);
+    
+    ASSERT_TRUE(cmd.has_value());
+    EXPECT_NEAR(cmd->yaw, 1.5f, 0.001f);
+    EXPECT_NEAR(cmd->pitch, -0.3f, 0.001f);
+    EXPECT_TRUE(cmd->fire);
+}
+
+TEST_F(ProtocolTest, RejectInvalidPacket) {
+    std::vector<uint8_t> invalid = {0x00, 0x01, 0x02};  // 错误的帧头
+    auto cmd = protocol_.Unpack<AimCommand>(invalid);
+    EXPECT_FALSE(cmd.has_value());
+}
+```
+
+坐标变换测试验证几何计算的正确性：
+
+```cpp
+TEST(CoordinateTransform, CameraToWorld) {
+    Transform tf;
+    tf.SetCameraToGimbal(/* ... */);
+    tf.SetGimbalToWorld(/* ... */);
+    
+    Point3D point_camera{1.0, 0.0, 5.0};
+    Point3D point_world = tf.CameraToWorld(point_camera);
+    
+    // 验证变换结果
+    EXPECT_NEAR(point_world.x, expected_x, 0.001);
+    EXPECT_NEAR(point_world.y, expected_y, 0.001);
+    EXPECT_NEAR(point_world.z, expected_z, 0.001);
+}
+
+TEST(CoordinateTransform, RoundTrip) {
+    // 变换后再逆变换应该得到原点
+    Transform tf;
+    Point3D original{1.0, 2.0, 3.0};
+    Point3D transformed = tf.CameraToWorld(original);
+    Point3D back = tf.WorldToCamera(transformed);
+    
+    EXPECT_NEAR(back.x, original.x, 0.001);
+    EXPECT_NEAR(back.y, original.y, 0.001);
+    EXPECT_NEAR(back.z, original.z, 0.001);
+}
+```
+
+仿真环境对于端到端测试非常有价值。Gazebo、Unity 等仿真器可以模拟机器人的物理行为和传感器输入，让你在不需要真实硬件的情况下测试完整的系统。仿真测试可以自动化运行，在每次代码提交时验证系统的整体行为。虽然仿真与现实存在差距（sim-to-real gap），但它能发现大量问题，节省宝贵的实机调试时间。
+
+测试不是写完就结束的任务，而是需要持续维护的资产。当代码变化时，测试也要相应更新。当发现 bug 时，先写一个复现 bug 的测试，再修复 bug——这样可以防止 bug 复发。将测试作为持续集成的一部分，每次代码推送都自动运行，及早发现问题。
+
+编写测试需要时间，但这是值得的投资。测试给你信心去修改和改进代码，让你能够快速迭代而不是小心翼翼。在 RoboMaster 紧张的赛季中，这种信心尤为重要。
+
 
 === 调试技巧
 // 高效定位问题
