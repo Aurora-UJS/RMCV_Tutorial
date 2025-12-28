@@ -2135,12 +2135,12 @@ add_library(rm_core src/core.cpp)
 
 目标的类型包括：
 
-- **可执行文件**：`add_executable` 创建，最终生成可运行的程序
-- **静态库**：`add_library(name STATIC ...)` 创建，生成 `.a` 文件
-- **共享库**：`add_library(name SHARED ...)` 创建，生成 `.so` 文件
-- **接口库**：`add_library(name INTERFACE)` 创建，不生成实际文件，只用于传递属性
-- **对象库**：`add_library(name OBJECT ...)` 创建，生成目标文件但不打包
-- **导入目标**：表示外部已存在的库，由 `find_package` 创建
+- *可执行文件*：`add_executable` 创建，最终生成可运行的程序
+- *静态库*：`add_library(name STATIC ...)` 创建，生成 `.a` 文件
+- *共享库*：`add_library(name SHARED ...)` 创建，生成 `.so` 文件
+- *接口库*：`add_library(name INTERFACE)` 创建，不生成实际文件，只用于传递属性
+- *对象库*：`add_library(name OBJECT ...)` 创建，生成目标文件但不打包
+- *导入目标*：表示外部已存在的库，由 `find_package` 创建
 
 还有一种特殊的"目标"是自定义目标，用 `add_custom_target` 创建，它不对应任何文件，而是执行自定义命令：
 
@@ -2487,7 +2487,7 @@ target_link_libraries(app PRIVATE config_loader)
 
 问题是：`config_loader` 链接 `json_parser` 时，应该用 PRIVATE、PUBLIC 还是 INTERFACE？
 
-**PRIVATE** 表示：这个依赖只在当前目标内部使用，不暴露给依赖当前目标的其他目标。
+*PRIVATE* 表示：这个依赖只在当前目标内部使用，不暴露给依赖当前目标的其他目标。
 
 如果 `config_loader` 的头文件中没有使用 `json_parser` 的任何类型，只在 `.cpp` 文件中使用：
 
@@ -2520,7 +2520,7 @@ target_link_libraries(config_loader PRIVATE json_parser)
 
 `app` 链接 `config_loader` 时，不会自动链接 `json_parser`，因为它被隐藏了。
 
-**PUBLIC** 表示：这个依赖既在当前目标内部使用，也暴露给依赖当前目标的其他目标。
+*PUBLIC* 表示：这个依赖既在当前目标内部使用，也暴露给依赖当前目标的其他目标。
 
 如果 `config_loader` 的头文件中使用了 `json_parser` 的类型：
 
@@ -2543,7 +2543,7 @@ target_link_libraries(config_loader PUBLIC json_parser)
 
 `app` 链接 `config_loader` 时，会自动链接 `json_parser`，因为 `app` 要编译包含 `config_loader.h` 的代码，而 `config_loader.h` 包含了 `json_parser/json.h`。
 
-**INTERFACE** 表示：这个依赖只暴露给依赖当前目标的其他目标，当前目标本身不使用。
+*INTERFACE* 表示：这个依赖只暴露给依赖当前目标的其他目标，当前目标本身不使用。
 
 这听起来有点奇怪，什么时候会用到？最常见的场景是 header-only 库：
 
@@ -4004,7 +4004,7 @@ message(STATUS "OpenCV libraries: ${OpenCV_LIBRARIES}")
 
 `find_package` 有两种工作模式：Config 模式和 Module 模式。理解它们的区别有助于排查找不到库的问题。
 
-**Module 模式**使用 CMake 自带的或项目提供的 `FindXXX.cmake` 文件来查找库。这些文件通常位于 CMake 的模块目录或项目的 `cmake/` 目录中。CMake 自带了许多常用库的 Find 模块，如 `FindThreads.cmake`、`FindOpenGL.cmake` 等。
+*Module 模式*使用 CMake 自带的或项目提供的 `FindXXX.cmake` 文件来查找库。这些文件通常位于 CMake 的模块目录或项目的 `cmake/` 目录中。CMake 自带了许多常用库的 Find 模块，如 `FindThreads.cmake`、`FindOpenGL.cmake` 等。
 
 ```cmake
 # CMake 自带的 Find 模块
@@ -4014,7 +4014,7 @@ find_package(OpenGL REQUIRED)    # 使用 FindOpenGL.cmake
 
 Module 模式的查找逻辑由 Find 模块的作者编写，通常会搜索常见的安装位置、检查环境变量、调用 pkg-config 等。
 
-**Config 模式**使用库自己提供的 `XXXConfig.cmake` 或 `xxx-config.cmake` 文件。这些文件由库的作者编写，与库一起安装。现代的 C++ 库大多提供 Config 文件。
+*Config 模式*使用库自己提供的 `XXXConfig.cmake` 或 `xxx-config.cmake` 文件。这些文件由库的作者编写，与库一起安装。现代的 C++ 库大多提供 Config 文件。
 
 ```cmake
 # 使用库提供的 Config 文件
@@ -4116,7 +4116,7 @@ endif()
 
 让我们看看 RoboMaster 开发中常用库的查找方式。
 
-**OpenCV** 是计算机视觉的基础库：
+*OpenCV* 是计算机视觉的基础库：
 
 ```cmake
 find_package(OpenCV REQUIRED)
@@ -4136,7 +4136,7 @@ target_link_libraries(my_app PRIVATE
 )
 ```
 
-**Eigen** 是 header-only 的线性代数库：
+*Eigen* 是 header-only 的线性代数库：
 
 ```cmake
 find_package(Eigen3 REQUIRED)
@@ -4147,7 +4147,7 @@ target_link_libraries(my_app PRIVATE Eigen3::Eigen)
 
 注意包名是 `Eigen3` 不是 `Eigen`。由于 Eigen 是 header-only 的，"链接"它实际上只是添加 include 路径和编译选项，不会有实际的库文件被链接。
 
-**Ceres Solver** 是非线性优化库：
+*Ceres Solver* 是非线性优化库：
 
 ```cmake
 find_package(Ceres REQUIRED)
@@ -4157,7 +4157,7 @@ target_link_libraries(my_app PRIVATE Ceres::ceres)
 
 Ceres 依赖 Eigen 和其他库，但通过导入目标，这些依赖会自动处理。
 
-**Threads** 是 POSIX 线程库（pthread）：
+*Threads* 是 POSIX 线程库（pthread）：
 
 ```cmake
 find_package(Threads REQUIRED)
@@ -4167,7 +4167,7 @@ target_link_libraries(my_app PRIVATE Threads::Threads)
 
 `Threads::Threads` 是跨平台的，在 Linux 上链接 pthread，在 Windows 上使用 Windows 线程 API。
 
-**Google Test** 是单元测试框架：
+*Google Test* 是单元测试框架：
 
 ```cmake
 find_package(GTest REQUIRED)
@@ -4185,7 +4185,7 @@ target_link_libraries(my_tests PRIVATE
 )
 ```
 
-**Boost** 是一个大型的 C++ 库集合：
+*Boost* 是一个大型的 C++ 库集合：
 
 ```cmake
 find_package(Boost REQUIRED COMPONENTS filesystem system)
@@ -4200,7 +4200,7 @@ find_package(Boost REQUIRED)
 target_link_libraries(my_app PRIVATE Boost::boost)  # 只有 headers
 ```
 
-**fmt** 是现代的格式化库：
+*fmt* 是现代的格式化库：
 
 ```cmake
 find_package(fmt REQUIRED)
@@ -4211,7 +4211,7 @@ target_link_libraries(my_app PRIVATE fmt::fmt)
 target_link_libraries(my_app PRIVATE fmt::fmt-header-only)
 ```
 
-**spdlog** 是高性能日志库：
+*spdlog* 是高性能日志库：
 
 ```cmake
 find_package(spdlog REQUIRED)
@@ -5290,9 +5290,9 @@ sudo cmake --build . --target uninstall
 
 编写可安装的库时，遵循以下最佳实践：
 
-1. **使用 GNUInstallDirs**：确保安装路径符合平台约定
+1. *使用 GNUInstallDirs*：确保安装路径符合平台约定
 
-2. **使用生成器表达式区分构建和安装路径**：
+2. *使用生成器表达式区分构建和安装路径*：
    ```cmake
    target_include_directories(mylib PUBLIC
        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -5300,20 +5300,20 @@ sudo cmake --build . --target uninstall
    )
    ```
 
-3. **使用命名空间**：导出目标时添加命名空间前缀（如 `MyLib::`）
+3. *使用命名空间*：导出目标时添加命名空间前缀（如 `MyLib::`）
 
-4. **创建别名目标**：便于在项目内部使用相同的目标名称
+4. *创建别名目标*：便于在项目内部使用相同的目标名称
    ```cmake
    add_library(MyLib::mylib ALIAS mylib)
    ```
 
-5. **处理依赖**：在 Config 文件中使用 `find_dependency` 查找 PUBLIC 依赖
+5. *处理依赖*：在 Config 文件中使用 `find_dependency` 查找 PUBLIC 依赖
 
-6. **提供版本文件**：支持版本检查
+6. *提供版本文件*：支持版本检查
 
-7. **考虑组件**：大型项目应该分组件安装
+7. *考虑组件*：大型项目应该分组件安装
 
-8. **测试安装**：在 CI 中测试完整的安装和使用流程
+8. *测试安装*：在 CI 中测试完整的安装和使用流程
 
 正确的安装和导出配置让你的库成为 CMake 生态的一等公民。用户可以像使用任何标准库一样使用你的库，无需了解内部结构，只需要简单的 `find_package` 和 `target_link_libraries`。这种良好的封装是高质量库的标志。
 
@@ -5542,7 +5542,7 @@ target_link_libraries(my_node
 
 RoboMaster 开发中常用的 ROS 2 包：
 
-**核心包**：
+*核心包*：
 
 ```cmake
 # ROS 2 C++ 客户端库
@@ -5555,7 +5555,7 @@ find_package(rclcpp_components REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 ```
 
-**消息包**：
+*消息包*：
 
 ```cmake
 # 标准消息类型
@@ -5571,7 +5571,7 @@ find_package(geometry_msgs REQUIRED)     # Pose, Transform, Twist, Point 等
 find_package(visualization_msgs REQUIRED) # Marker, MarkerArray
 ```
 
-**图像处理**：
+*图像处理*：
 
 ```cmake
 # OpenCV 与 ROS 的桥接
@@ -5584,7 +5584,7 @@ find_package(image_transport REQUIRED)
 find_package(camera_info_manager REQUIRED)
 ```
 
-**坐标变换**：
+*坐标变换*：
 
 ```cmake
 # TF2 核心库
@@ -6405,9 +6405,9 @@ CMake Error at CMakeLists.txt:10 (find_package):
   "OpenCV_DIR" to a directory containing one of the above files.
 ```
 
-**原因**：CMake 无法在默认搜索路径中找到库的配置文件。
+*原因*：CMake 无法在默认搜索路径中找到库的配置文件。
 
-**解决方案**：
+*解决方案*：
 
 1. 确认库已正确安装：
 ```bash
@@ -6444,7 +6444,7 @@ cmake ..
 cmake --debug-find ..
 ```
 
-**常见陷阱**：
+*常见陷阱*：
 
 - 包名大小写敏感：`find_package(OpenCV)` 不同于 `find_package(opencv)`
 - 有些包名与库名不同：Eigen 的包名是 `Eigen3` 而不是 `Eigen`
@@ -6459,9 +6459,9 @@ cmake --debug-find ..
 collect2: error: ld returned 1 exit status
 ```
 
-**原因**：链接器找不到某个符号的定义。
+*原因*：链接器找不到某个符号的定义。
 
-**常见原因和解决方案**：
+*常见原因和解决方案*：
 
 1. 忘记链接库：
 ```cmake
@@ -6514,7 +6514,7 @@ extern "C" {
 # 或者显式实例化
 ```
 
-**调试技巧**：
+*调试技巧*：
 
 ```bash
 # 查看目标文件的符号
@@ -6538,9 +6538,9 @@ fatal error: opencv2/core.hpp: No such file or directory
 compilation terminated.
 ```
 
-**原因**：编译器找不到头文件。
+*原因*：编译器找不到头文件。
 
-**解决方案**：
+*解决方案*：
 
 1. 检查 `target_include_directories`：
 ```cmake
@@ -6572,7 +6572,7 @@ pkg-config --cflags opencv4
 target_include_directories(mylib PUBLIC include)
 ```
 
-**调试技巧**：
+*调试技巧*：
 
 ```bash
 # 查看实际的编译命令
@@ -6594,15 +6594,15 @@ symbol lookup error: ./app: undefined symbol: _ZNSt7__cxx1112basic_stringIcSt11c
 Segmentation fault (core dumped)
 ```
 
-**原因**：不同编译器版本或编译选项编译的代码混合使用。
+*原因*：不同编译器版本或编译选项编译的代码混合使用。
 
-**常见场景**：
+*常见场景*：
 
 - 用 GCC 7 编译的库与 GCC 11 编译的程序链接
 - Debug 模式编译的库与 Release 模式编译的程序链接
 - 使用了不同的 C++ 标准库（libstdc++ vs libc++）
 
-**解决方案**：
+*解决方案*：
 
 1. 统一编译器版本：
 ```bash
@@ -6636,7 +6636,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 CMake 提供了多种方式来获取调试信息：
 
-**cmake --debug-find**：
+*cmake --debug-find*：
 
 ```bash
 # 显示 find_package 的详细搜索过程
@@ -6648,7 +6648,7 @@ cmake --debug-find ..
 #   ...
 ```
 
-**cmake --trace**：
+*cmake --trace*：
 
 ```bash
 # 显示每条 CMake 命令的执行
@@ -6658,7 +6658,7 @@ cmake --trace ..
 cmake --trace-source=CMakeLists.txt ..
 ```
 
-**message 打印变量**：
+*message 打印变量*：
 
 ```cmake
 # 打印变量值
@@ -6681,7 +6681,7 @@ if(CMAKE_DEBUG)
 endif()
 ```
 
-**查看编译命令**：
+*查看编译命令*：
 
 ```bash
 # Make
@@ -6698,7 +6698,7 @@ cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..
 cat compile_commands.json
 ```
 
-**查看缓存**：
+*查看缓存*：
 
 ```bash
 # 列出所有缓存变量
@@ -6715,18 +6715,18 @@ grep "OpenCV" CMakeCache.txt
 
 选择合适的 `cmake_minimum_required` 版本需要权衡：
 
-**版本太低的问题**：
+*版本太低的问题*：
 
 - 无法使用新特性
 - 可能触发过时的行为
 - 错过 bug 修复
 
-**版本太高的问题**：
+*版本太高的问题*：
 
 - 老系统的用户无法构建
 - 限制了项目的兼容性
 
-**推荐的版本选择**：
+*推荐的版本选择*：
 
 ```cmake
 # 2024-2025 年的新项目推荐
@@ -6745,24 +6745,24 @@ cmake_minimum_required(VERSION 3.10)
 cmake_minimum_required(VERSION 3.16...3.28)
 ```
 
-**各版本引入的重要特性**：
+*各版本引入的重要特性*：
 
-- **3.0**：目标 INTERFACE 属性、生成器表达式
-- **3.1**：`target_compile_features`
-- **3.8**：C++17 支持
-- **3.11**：`FetchContent` 模块
-- **3.12**：`CONFIGURE_DEPENDS` for GLOB
-- **3.14**：`FetchContent_MakeAvailable`
-- **3.16**：预编译头文件支持、统一构建
-- **3.19**：预设（presets）支持
-- **3.20**：C++23 支持
-- **3.21**：改进的消息颜色和格式
+- *3.0*：目标 INTERFACE 属性、生成器表达式
+- *3.1*：`target_compile_features`
+- *3.8*：C++17 支持
+- *3.11*：`FetchContent` 模块
+- *3.12*：`CONFIGURE_DEPENDS` for GLOB
+- *3.14*：`FetchContent_MakeAvailable`
+- *3.16*：预编译头文件支持、统一构建
+- *3.19*：预设（presets）支持
+- *3.20*：C++23 支持
+- *3.21*：改进的消息颜色和格式
 
 ==== 常见的 CMake 反模式
 
 以下是应该避免的做法：
 
-**反模式 1：使用全局命令**
+*反模式 1：使用全局命令*
 
 ```cmake
 # 不好：影响所有目标
@@ -6776,7 +6776,7 @@ target_link_libraries(myapp PRIVATE somelib)
 target_compile_definitions(myapp PRIVATE SOME_MACRO)
 ```
 
-**反模式 2：修改 CMAKE_CXX_FLAGS**
+*反模式 2：修改 CMAKE_CXX_FLAGS*
 
 ```cmake
 # 不好：全局修改
@@ -6786,7 +6786,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 target_compile_options(myapp PRIVATE -Wall -Wextra)
 ```
 
-**反模式 3：使用 file(GLOB) 收集源文件**
+*反模式 3：使用 file(GLOB) 收集源文件*
 
 ```cmake
 # 不好：新文件不会自动触发重新配置
@@ -6801,7 +6801,7 @@ add_library(mylib
 )
 ```
 
-**反模式 4：不使用目标的 PUBLIC/PRIVATE**
+*反模式 4：不使用目标的 PUBLIC/PRIVATE*
 
 ```cmake
 # 不好：没有指定可见性
@@ -6811,7 +6811,7 @@ target_link_libraries(mylib otherlib)
 target_link_libraries(mylib PRIVATE otherlib)
 ```
 
-**反模式 5：源内构建**
+*反模式 5：源内构建*
 
 ```bash
 # 不好：污染源代码目录
@@ -6824,7 +6824,7 @@ mkdir build && cd build
 cmake ..
 ```
 
-**反模式 6：硬编码路径**
+*反模式 6：硬编码路径*
 
 ```cmake
 # 不好：不可移植
@@ -6835,7 +6835,7 @@ find_package(SomeLib REQUIRED)
 target_link_libraries(myapp PRIVATE SomeLib::SomeLib)
 ```
 
-**反模式 7：不使用导入目标**
+*反模式 7：不使用导入目标*
 
 ```cmake
 # 不好：使用变量
@@ -6846,7 +6846,7 @@ target_link_libraries(myapp PRIVATE ${OpenCV_LIBRARIES})
 target_link_libraries(myapp PRIVATE OpenCV::OpenCV)
 ```
 
-**反模式 8：在 find_package 后不检查结果**
+*反模式 8：在 find_package 后不检查结果*
 
 ```cmake
 # 不好：如果找不到会静默失败
@@ -6866,7 +6866,7 @@ endif()
 
 最后，让我们总结现代 CMake 的最佳实践：
 
-**项目设置**：
+*项目设置*：
 
 ```cmake
 # 要求合理的 CMake 版本
@@ -6893,7 +6893,7 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ```
 
-**目标定义**：
+*目标定义*：
 
 ```cmake
 # 创建库
@@ -6922,7 +6922,7 @@ target_compile_options(mylib PRIVATE
 )
 ```
 
-**依赖管理**：
+*依赖管理*：
 
 ```cmake
 # 使用 find_package 查找已安装的库
@@ -6950,7 +6950,7 @@ FetchContent_Declare(fmt
 FetchContent_MakeAvailable(fmt)
 ```
 
-**安装和导出**：
+*安装和导出*：
 
 ```cmake
 include(GNUInstallDirs)
@@ -6997,7 +6997,7 @@ install(FILES
 )
 ```
 
-**测试**：
+*测试*：
 
 ```cmake
 # 使用 BUILD_TESTING 控制测试构建
@@ -7017,7 +7017,7 @@ if(BUILD_TESTING)
 endif()
 ```
 
-**项目结构建议**：
+*项目结构建议*：
 
 ```
 my_project/
