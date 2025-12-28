@@ -2566,7 +2566,7 @@ std::cout << ref << std::endl;
 
 引用的语法更简洁，代码也更容易阅读。特别是在连续的操作中，不断地写 `*ptr` 会让代码显得杂乱。
 
-此外，引用没有"引用的引用"或"引用的数组"这样的概念，而指针可以有多级指针（如 `int**`）和指针数组。在需要复杂数据结构的场合，指针提供了更大的灵活性。
+此外，引用没有"引用的引用"或"引用的数组"这样的概念，而指针可以有多级指针（如 `int*`）和指针数组。在需要复杂数据结构的场合，指针提供了更大的灵活性。
 
 在实践中，应当优先考虑使用引用，除非以下情况需要使用指针：需要表示"可能不存在"（使用 `nullptr`）、需要在运行时改变所指对象、需要进行指针运算、或者需要与 C 语言接口交互。现代 C++ 的设计哲学是：能用引用就不用指针，能用智能指针就不用裸指针。
 
@@ -7947,11 +7947,11 @@ v1 < v2;       // 小于
 随机访问        O(1)      O(1)      O(n)      O(log n)  O(1) 平均
 头部插入        O(n)      O(1)      O(1)      -         -
 尾部插入        O(1)*     O(1)      O(1)      -         -
-中间插入        O(n)      O(n)      O(1)**    O(log n)  O(1) 平均
+中间插入        O(n)      O(n)      O(1)*    O(log n)  O(1) 平均
 查找            O(n)      O(n)      O(n)      O(log n)  O(1) 平均
 
 * 摊销常数时间
-** 已有迭代器的情况下
+* 已有迭代器的情况下
 ```
 
 然而，时间复杂度只是故事的一部分。`vector` 的缓存局部性使得它在很多场景下即使时间复杂度较高（如 O(n) 的中间插入），实际性能也优于理论上更快的 `list`。现代 CPU 的缓存机制使得连续内存访问比离散内存访问快得多。
@@ -14700,7 +14700,7 @@ class AnalyticCost : public ceres::SizedCostFunction<1, 1> {
 public:
     bool Evaluate(double const* const* parameters,
                   double* residuals,
-                  double** jacobians) const override {
+                  double* jacobians) const override {
         double x = parameters[0][0];
         residuals[0] = x * x - 10.0;
         
