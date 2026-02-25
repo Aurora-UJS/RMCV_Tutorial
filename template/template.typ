@@ -94,15 +94,29 @@
   // show: remove-cjk-break-space
 
   set text(lang: "zh")
-  set text(font: ("libertinus serif", "Times New Roman", "FZShuSong-Z01S", "Source Han Serif"))
-
-  // Set the font used for CJK punctuation marks
-  show regex("[。？！，、；：“”‘’『』「」（）〔〕【】─…—～·《》〈〉__]+"): set text(font: "Source Han Serif")
-
-  show text.where(weight: "bold").or(strong): set text(font: (
+  // Prefer CJK serif fonts first to avoid mixed punctuation glyph styles.
+  set text(font: (
+    "Source Han Serif SC",
+    "Source Han Serif",
+    "Noto Serif CJK SC",
+    "Noto Serif CJK",
+    "FZShuSong-Z01S",
     "libertinus serif",
     "Times New Roman",
+  ))
+
+  // Set the font used for CJK punctuation marks
+  show regex("[。？！，、；：“”‘’『』「」（）〔〕【】─…—～·《》〈〉__]+"): set text(
+    font: ("Source Han Serif SC", "Source Han Serif", "Noto Serif CJK SC", "Noto Serif CJK")
+  )
+
+  show text.where(weight: "bold").or(strong): set text(font: (
+    "Source Han Serif SC",
     "Source Han Serif",
+    "Noto Serif CJK SC",
+    "Noto Serif CJK",
+    "libertinus serif",
+    "Times New Roman",
   ))
 
   // Set the body font.

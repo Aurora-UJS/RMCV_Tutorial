@@ -60,37 +60,15 @@
 // - 团队工作流（PR、Code Review）
 // - .gitignore 与 submodule
 // 建议单独成章，RoboMaster 团队协作必备
-//#include "git_guide.typ"
+#include "git_guide.typ"
 
-== ROS/ROS2入门
+== ROS/ROS2 入门
 // - ROS 架构与概念
 // - 话题、服务、动作
 // - 创建节点与发布订阅
 // - launch 文件
 // - ROS 工具（rqt、rviz）
 // - 实战：简单的视觉/决策节点
+#include "ros_guide.typ"
 
 
-
-#blockquote[
-  Euler's identity is $e^(pi i) + 1 = 0$. Do you really believe that they charged an armed enemy, or treated their children, their own flesh and blood, so cruelly, without a thought for their own interest or advantage? Such is Schrödinger's equation in
-
-  $ i planck.reduce frac(diff, diff t) Psi lr((x comma t)) eq lr([minus frac(planck.reduce^2, 2 m) frac(diff^2, diff x^2) plus V lr((x comma t))]) Psi lr((x comma t)) $ 
-
-  #blockquote[
-    But who has any right to find fault with a man who chooses to enjoy a pleasure that has no annoying consequences, or one who avoids a pain that produces no resultant pleasure?
-  ]
-]
-
-But I must explain to you how all this mistaken idea of reprobating pleasure and extolling pain arose. Increase ease-of-use to where `variable` and `print()` shall be of use.
-
-#figure(caption: [Example `python` code printing text.])[
-```python
-if a != b:
-  print("Hello world!")
-else if a == b:
-  print("Goodbye world!")
-else:
-  print("This is a long sentence where I ramble until I get 80 characters here.")
-```
-] <py-test>

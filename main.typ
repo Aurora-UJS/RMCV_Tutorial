@@ -18,7 +18,7 @@
   listing-index: (enabled: true),
 )
 
-//TODO:自喵测试？持续集成？
+//TODO：自喵测试？持续集成？
 = 基础篇
 #include "chapters/1.Foundation/index.typ"
 = 数学理论篇
