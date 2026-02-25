@@ -8,48 +8,331 @@
       :root {
         color-scheme: light dark;
       }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
+        background: #0f1115;
+        color: #e8eaed;
         font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
       }
-      header {
-        padding: 12px 16px;
-        border-bottom: 1px solid #9994;
+      .toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
         display: flex;
+        gap: 10px;
         align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
+        padding: 10px 14px;
+        border-bottom: 1px solid #ffffff22;
+        background: #151923ee;
+        backdrop-filter: blur(8px);
       }
-      h1 {
-        margin: 0;
-        font-size: 18px;
+      .title {
+        font-weight: 700;
+        margin-right: auto;
+        white-space: nowrap;
       }
-      .links {
-        display: flex;
-        gap: 12px;
-        font-size: 14px;
-      }
-      a {
+      button,
+      input,
+      select,
+      a.link-btn {
+        border: 1px solid #ffffff2b;
+        border-radius: 8px;
+        background: #1d2230;
+        color: #e8eaed;
+        font: inherit;
+        padding: 6px 10px;
         text-decoration: none;
       }
-      a:hover {
-        text-decoration: underline;
+      button:hover,
+      a.link-btn:hover {
+        background: #252c3f;
+        cursor: pointer;
+      }
+      input {
+        width: 78px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        min-height: calc(100vh - 57px);
+      }
+      .outline {
+        border-right: 1px solid #ffffff16;
+        padding: 12px;
+        overflow: auto;
+        background: #141821;
+      }
+      .outline h2 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        color: #b4becc;
+      }
+      .outline ul {
+        margin: 0;
+        padding-left: 16px;
+      }
+      .outline li {
+        margin: 6px 0;
+      }
+      .outline button {
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: transparent;
+        color: #d8e0ee;
+        padding: 2px 4px;
+      }
+      .outline button:hover {
+        background: #ffffff14;
+        border-radius: 6px;
       }
       .viewer {
-        width: 100%;
-        height: calc(100vh - 58px);
-        border: 0;
+        overflow: auto;
+        padding: 22px;
+      }
+      .status {
+        margin: 0 auto 12px;
+        max-width: 920px;
+        color: #9aabbe;
+      }
+      .paper {
+        margin: 0 auto;
+        width: fit-content;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 12px 36px #0009;
+        background: #1f2430;
+      }
+      canvas {
+        display: block;
+        max-width: min(100vw - 60px, 1200px);
+        height: auto;
+      }
+      @media (max-width: 980px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .outline {
+          display: none;
+          max-height: 38vh;
+          border-right: 0;
+          border-bottom: 1px solid #ffffff16;
+        }
+        .outline.open {
+          display: block;
+        }
       }
     </style>
   </head>
   <body>
-    <header>
-      <h1>RoboMaster 视觉教程（在线版）</h1>
-      <div class="links">
-        <a href="./main.pdf" target="_blank" rel="noopener">新标签打开 PDF</a>
-        <a href="./main.pdf" download>下载 PDF</a>
-      </div>
+    <header class="toolbar">
+      <button id="toggle-outline" title="显示/隐藏目录">目录</button>
+      <span class="title">RoboMaster 视觉教程（在线版）</span>
+
+      <button id="prev-page" title="上一页">上一页</button>
+      <button id="next-page" title="下一页">下一页</button>
+      <input id="page-input" type="number" min="1" value="1" />
+      <span id="page-count">/ ?</span>
+
+      <button id="zoom-out" title="缩小">-</button>
+      <select id="zoom-select">
+        <option value="0.9">90%</option>
+        <option value="1.0">100%</option>
+        <option value="1.15" selected>115%</option>
+        <option value="1.3">130%</option>
+        <option value="1.5">150%</option>
+      </select>
+      <button id="zoom-in" title="放大">+</button>
+
+      <a class="link-btn" href="./main.pdf" target="_blank" rel="noopener">新标签打开</a>
+      <a class="link-btn" href="./main.pdf" download>下载 PDF</a>
     </header>
-    <iframe class="viewer" src="./main.pdf#view=FitH"></iframe>
+
+    <div class="layout">
+      <aside id="outline" class="outline">
+        <h2>目录</h2>
+        <ul id="outline-list"></ul>
+      </aside>
+
+      <main class="viewer">
+        <p id="status" class="status">正在加载 PDF...</p>
+        <div class="paper">
+          <canvas id="pdf-canvas"></canvas>
+        </div>
+      </main>
+    </div>
+
+    <script type="module">
+      const statusEl = document.getElementById("status");
+      let pdfjsLib;
+      try {
+        pdfjsLib = await import(
+          "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs"
+        );
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent =
+          "在线阅读组件加载失败（可能是网络限制）。请使用右上角“新标签打开”或“下载 PDF”。";
+      }
+      if (!pdfjsLib) {
+        throw new Error("pdf.js import failed");
+      }
+
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs";
+
+      const pdfUrl = "./main.pdf";
+      const state = {
+        pdfDoc: null,
+        pageNum: 1,
+        scale: 1.15,
+        rendering: false,
+        pendingPage: null,
+      };
+
+      const canvas = document.getElementById("pdf-canvas");
+      const ctx = canvas.getContext("2d");
+      const pageInput = document.getElementById("page-input");
+      const pageCount = document.getElementById("page-count");
+      const zoomSelect = document.getElementById("zoom-select");
+      const outlinePane = document.getElementById("outline");
+      const outlineList = document.getElementById("outline-list");
+
+      document.getElementById("toggle-outline").addEventListener("click", () => {
+        outlinePane.classList.toggle("open");
+      });
+      document.getElementById("prev-page").addEventListener("click", () => goToPage(state.pageNum - 1));
+      document.getElementById("next-page").addEventListener("click", () => goToPage(state.pageNum + 1));
+      document.getElementById("zoom-in").addEventListener("click", () => setZoom(state.scale + 0.1));
+      document.getElementById("zoom-out").addEventListener("click", () => setZoom(state.scale - 0.1));
+
+      pageInput.addEventListener("change", () => goToPage(Number(pageInput.value)));
+      zoomSelect.addEventListener("change", () => setZoom(Number(zoomSelect.value)));
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") goToPage(state.pageNum - 1);
+        if (e.key === "ArrowRight") goToPage(state.pageNum + 1);
+      });
+
+      function clamp(num, min, max) {
+        return Math.max(min, Math.min(max, num));
+      }
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function goToPage(pageNum) {
+        if (!state.pdfDoc) return;
+        state.pageNum = clamp(pageNum, 1, state.pdfDoc.numPages);
+        pageInput.value = String(state.pageNum);
+        queueRenderPage(state.pageNum);
+      }
+
+      function setZoom(scale) {
+        state.scale = clamp(scale, 0.5, 2.5);
+        zoomSelect.value = String(Math.round(state.scale * 100) / 100);
+        queueRenderPage(state.pageNum);
+      }
+
+      async function renderPage(pageNum) {
+        state.rendering = true;
+        const page = await state.pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: state.scale });
+
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(viewport.width * dpr);
+        canvas.height = Math.floor(viewport.height * dpr);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        setStatus(`第 ${pageNum} / ${state.pdfDoc.numPages} 页`);
+        state.rendering = false;
+        if (state.pendingPage !== null) {
+          const next = state.pendingPage;
+          state.pendingPage = null;
+          renderPage(next);
+        }
+      }
+
+      function queueRenderPage(pageNum) {
+        if (state.rendering) {
+          state.pendingPage = pageNum;
+        } else {
+          renderPage(pageNum);
+        }
+      }
+
+      async function resolvePageNumber(dest) {
+        if (!dest) return null;
+        let destination = dest;
+        if (typeof dest === "string") {
+          destination = await state.pdfDoc.getDestination(dest);
+        }
+        if (!Array.isArray(destination) || !destination[0]) return null;
+        const pageIndex = await state.pdfDoc.getPageIndex(destination[0]);
+        return pageIndex + 1;
+      }
+
+      async function appendOutlineItems(items, parent) {
+        for (const item of items) {
+          const li = document.createElement("li");
+          const btn = document.createElement("button");
+          btn.textContent = item.title || "（无标题）";
+
+          const pageNum = await resolvePageNumber(item.dest);
+          if (pageNum) {
+            btn.addEventListener("click", () => goToPage(pageNum));
+            btn.title = `跳转到第 ${pageNum} 页`;
+          } else {
+            btn.disabled = true;
+            btn.style.opacity = "0.6";
+          }
+
+          li.appendChild(btn);
+          parent.appendChild(li);
+
+          if (item.items && item.items.length > 0) {
+            const sub = document.createElement("ul");
+            li.appendChild(sub);
+            await appendOutlineItems(item.items, sub);
+          }
+        }
+      }
+
+      async function buildOutline() {
+        const outline = await state.pdfDoc.getOutline();
+        outlineList.innerHTML = "";
+        if (!outline || outline.length === 0) {
+          const li = document.createElement("li");
+          li.textContent = "未读取到书签目录";
+          outlineList.appendChild(li);
+          return;
+        }
+        await appendOutlineItems(outline, outlineList);
+      }
+
+      async function init() {
+        try {
+          setStatus("正在加载 PDF...");
+          state.pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+          pageCount.textContent = `/ ${state.pdfDoc.numPages}`;
+          pageInput.max = String(state.pdfDoc.numPages);
+          await buildOutline();
+          await renderPage(state.pageNum);
+        } catch (err) {
+          console.error(err);
+          setStatus("加载失败，请点击右上角“新标签打开”或“下载 PDF”。");
+        }
+      }
+
+      init();
+    </script>
   </body>
 </html>
