@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RMCV Tutorial 在线阅读</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0;
+        font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+      }
+      header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #9994;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .links {
+        display: flex;
+        gap: 12px;
+        font-size: 14px;
+      }
+      a {
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .viewer {
+        width: 100%;
+        height: calc(100vh - 58px);
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>RoboMaster 视觉教程（在线版）</h1>
+      <div class="links">
+        <a href="./main.pdf" target="_blank" rel="noopener">新标签打开 PDF</a>
+        <a href="./main.pdf" download>下载 PDF</a>
+      </div>
+    </header>
+    <iframe class="viewer" src="./main.pdf#view=FitH"></iframe>
+  </body>
+</html>
