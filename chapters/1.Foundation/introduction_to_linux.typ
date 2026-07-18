@@ -1,5 +1,6 @@
 
-#show raw.where(block: true): set block(inset: (left: 4em))
+#import "/template/template.typ": blockquote
+
 === Linux 的前世今生
 // 从 Unix 到 Linux 的历史脉络
 // - Unix 的诞生（1969，贝尔实验室，Ken Thompson & Dennis Ritchie）
@@ -47,9 +48,11 @@ Stallman 是一位极具原则性的人。在他看来，软件应该是自由�
 
 1991 年 8 月 25 日，芬兰赫尔辛基大学的一名 21 岁学生在 Usenet 新闻组发布了一条消息：
 
-> Hello everybody out there using minix -
->
-> I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu) for 386(486) AT clones.
+#blockquote[
+  Hello everybody out there using minix -
+
+  I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu) for 386(486) AT clones.
+]
 
 这个学生的名字是 Linus Torvalds，他正在开发的这个“业余爱好项目”，就是后来的 Linux 内核。
 
