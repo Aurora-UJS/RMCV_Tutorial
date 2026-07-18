@@ -1,6 +1,5 @@
 //== 软件工程基础
 
-#show raw.where(block: true): set block(inset: (left: 4em))
 === 为什么需要软件工程
 // 引言：从“能跑”到“能维护”
 // - 个人项目 vs 团队项目的差异

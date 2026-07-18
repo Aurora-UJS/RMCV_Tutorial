@@ -1,4 +1,3 @@
-#show raw.where(block: true): set block(inset: (left: 4em))
 
 === Git 基本概念
 // 从“复制文件备份”到“可追溯协作”

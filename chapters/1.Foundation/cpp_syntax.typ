@@ -1,6 +1,5 @@
 #import "/template/template.typ": *
 
-#show raw.where(block: true): set block(inset: (left: 4em))
 === C++ 基本程序结构
 // 添加编译相关：g++、CMake 简介
 // Hello World、编译流程

@@ -1,4 +1,3 @@
-#show raw.where(block: true): set block(inset: (left: 4em))
 
 === ROS/ROS2 架构与概念
 // 机器人软件为什么需要中间件
