@@ -21,9 +21,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Typst
+        uses: typst-community/setup-typst@v4
+        with:
+          typst-version: "0.15.0"
+
+      - name: Install CJK fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            fonts-noto-cjk fonts-noto-cjk-extra fonts-lxgw-wenkai
+
+      - name: Build PDF from source
+        run: typst compile --font-path fonts main.typ main.pdf
+
       - name: Prepare site files
         run: |
-          test -f main.pdf
           mkdir -p _site
           cp main.pdf _site/main.pdf
           cp web/index.html _site/index.html
