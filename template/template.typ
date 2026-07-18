@@ -123,8 +123,49 @@
   set text(size: 11pt) // default is 11pt
 
   // Set raw text font.
-  // Default is Fira Mono at 8.8pt
-  show raw: set text(font: ("Fira Mono","LXGW WenKai"))
+  // Fallback chain ends in fonts that are always available (DejaVu Sans Mono is
+  // embedded in the Typst binary), so code never degrades to a serif font when
+  // the preferred fonts are missing on the build machine.
+  show raw: set text(font: (
+    "Fira Mono",
+    "DejaVu Sans Mono",
+    "LXGW WenKai Mono",
+    "LXGW WenKai",
+    "Noto Sans Mono CJK SC",
+  ))
+
+  // Display inline code in a small box that retains the correct baseline.
+  // Raw text defaults to 0.8em; 1.15em on top of that yields ~0.92em of body size,
+  // so inline code is not dwarfed by the surrounding 11pt CJK text.
+  show raw.where(block: false): it => box(
+    fill: fill-color.darken(2%),
+    inset: (x: 3pt, y: 0pt),
+    outset: (y: 3pt),
+    radius: 2pt,
+    text(size: 1.15em, it),
+  )
+
+  // Display block code in a framed block with line numbers.
+  show raw.where(block: true): it => block(
+    width: 100%,
+    fill: fill-color,
+    stroke: 0.5pt + stroke-color,
+    radius: 4pt,
+    inset: (x: 10pt, y: 8pt),
+    breakable: true,
+  )[
+    #set text(size: 9pt)
+    #set par(justify: false, first-line-indent: 0pt, leading: 0.5em)
+    #grid(
+      columns: (auto, 1fr),
+      column-gutter: 1em,
+      row-gutter: 0.5em,
+      ..it.lines.map(l => (
+        align(right, text(fill: luma(165), size: 0.89em, str(l.number))),
+        l,
+      )).flatten()
+    )
+  ]
 
   // Configure page size and margins.
   set page(paper: paper-size, margin: (bottom: 1.75cm, top: 2.25cm))
@@ -169,6 +210,9 @@
 
   // Add vertical space after headings.
   show heading: it => {
+    // Inline code keeps its regular weight inside headings; otherwise the
+    // bold-text font rule above captures its text and switches it to serif.
+    show raw: set text(weight: "regular")
     v(1.65em, weak: true)
     it
     v(1.25em, weak: true)
