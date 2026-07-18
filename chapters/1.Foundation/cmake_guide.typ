@@ -6007,7 +6007,7 @@ ros2 run rm_vision detector_node
 ros2 launch rm_vision vision_launch.py
 ```
 
-==== --symlink-install：开发便利选项
+==== `--symlink-install`：开发便利选项
 
 `--symlink-install` 选项在安装时创建符号链接而不是复制文件，这对开发非常有用：
 
@@ -6636,7 +6636,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 CMake 提供了多种方式来获取调试信息：
 
-*cmake --debug-find*：
+*`cmake --debug-find`*：
 
 ```bash
 # 显示 find_package 的详细搜索过程
@@ -6648,7 +6648,7 @@ cmake --debug-find ..
 #   ...
 ```
 
-*cmake --trace*：
+*`cmake --trace`*：
 
 ```bash
 # 显示每条 CMake 命令的执行
