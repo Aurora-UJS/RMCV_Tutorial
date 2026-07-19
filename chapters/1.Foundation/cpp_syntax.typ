@@ -15262,7 +15262,7 @@ private:
 
 ```cpp
 // AX = XB 问题
-// A: 相机运动，B: 云台运动，X: 相机到云台的变换
+// A: 云台相对运动，B: 相机眼中标定板的相对运动，X: 相机到云台的变换
 struct HandEyeResidual {
     HandEyeResidual(const Eigen::Isometry3d& A, const Eigen::Isometry3d& B)
         : A_(A), B_(B) {}
@@ -15312,9 +15312,9 @@ private:
 
 class HandEyeCalibrator {
 public:
-    void addMotionPair(const Eigen::Isometry3d& camera_motion,
-                       const Eigen::Isometry3d& gimbal_motion) {
-        motion_pairs_.push_back({camera_motion, gimbal_motion});
+    void addMotionPair(const Eigen::Isometry3d& gimbal_motion,
+                       const Eigen::Isometry3d& board_in_camera_motion) {
+        motion_pairs_.push_back({gimbal_motion, board_in_camera_motion});
     }
     
     bool calibrate(Eigen::Isometry3d& X_out) {
@@ -15512,12 +15512,14 @@ bool small_ok = 0.8f <= dist && dist < 3.2f;   // 小装甲板
 bool large_ok = 3.2f <= dist && dist < 5.5f;   // 大装甲板
 ```
 
+#block(breakable: false)[
 在素材帧上跑一遍，四级各自的产出如下：
 
 #figure(
   image("images/cpp-opencv-lightbar.png", width: 100%),
   caption: [四级级联流水线。左下：品红为投票判蓝的灯条候选，青色为判红的候选，细黄线是几何配对候选，绿色交叉线与编号是分类器放行的最终结果；右下为检出区域放大。],
 )
+]
 
 ```text
 lights: 11
