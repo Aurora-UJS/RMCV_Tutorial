@@ -1,11 +1,11 @@
 == 计算机视觉基础
-
+#include "computer_vision_basics.typ"
 == 传统视觉算法
-
+#include "traditional_cv.typ"
 == 深度学习和神经网络
-
+#include "deep_learning.typ"
 == 相机模型
-
+#include "camera_model.typ"
 == 坐标变换
 #include "transformer.typ"
 == 卡尔曼滤波
