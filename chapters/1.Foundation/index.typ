@@ -4,15 +4,8 @@
 
 == 初识 Linux
 #include "introduction_to_linux.typ"
-// - Linux 发展历史
-// - 为什么 RoboMaster 用 Linux
-// - Linux vs Windows
-// - 发行版选择
 == 环境准备
 #include "install_ubuntu.typ"
-// - Ubuntu 安装方式（虚拟机/双系统/WSL2）
-// - 基础配置（输入法、网络、驱动）
-// - 开发环境搭建（VSCode、Terminal）
 
 
 == Linux & Ubuntu 操作
@@ -25,12 +18,6 @@
 
 
 == 计算机系统基础
-// - 进程与线程
-// - 内存管理（栈、堆）
-// - 文件系统
-// - 网络通信基础
-// - 为什么需要了解这些？（引出 C++ 内存管理、多线程）
-// 为后续 C++ 和软件工程打基础
 #include "computer_system_basics.typ"
 
 == C++ 语言基础

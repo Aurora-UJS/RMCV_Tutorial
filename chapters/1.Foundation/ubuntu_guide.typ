@@ -6041,13 +6041,8 @@ tmux a -t robot
 
 ==== VS Code 远程开发
 
-VS Code 的 Remote-SSH 扩展让你可以在本地编辑远程服务器上的代码，同时享受完整的 IDE 功能。
+VS Code 的 Remote-SSH 扩展让你可以在本地编辑远程服务器上的代码，同时享受完整的 IDE 功能。扩展安装、`~/.ssh/config` 主机别名和首次连接的流程，“环境准备”一章已经带你配过；学完本节的密钥认证，现在可以兑现当时的承诺——给主机配置补上一行 `IdentityFile ~/.ssh/id_ed25519`，从此连接免输密码：
 
-*安装和配置*
-
-1. 在本地 VS Code 中安装 "Remote - SSH" 扩展
-
-2. 配置 SSH（确保已设置密钥认证）：
 ```bash
 # ~/.ssh/config
 Host robot
@@ -6055,13 +6050,6 @@ Host robot
     User alice
     IdentityFile ~/.ssh/id_ed25519
 ```
-
-3. 在 VS Code 中连接：
-   - 按 `F1` 或 `Ctrl+Shift+P`
-   - 输入 "Remote-SSH: Connect to Host"
-   - 选择配置的主机
-
-4. 首次连接时，VS Code 会在远程主机安装服务器组件
 
 *远程开发工作流*
 
