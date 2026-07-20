@@ -11,7 +11,7 @@ import matplotlib as mpl
 BLUE, MAGENTA, GRAY = "#3B6FD4", "#D6336C", "#8A8A8A"
 mpl.rcParams.update({"font.size": 11, "axes.linewidth": 0.8})
 
-g, k, v0 = 9.8, 0.01867, 25.0        # 17 mm, 3.5 g, cd 0.47
+g, k, v0 = 9.8, 0.01903, 25.0        # 17 mm, 3.2 g, cd 0.47 (rho 1.169)
 
 # ---------- left: Newton vs bisection on f(T) = (1/k)ln(1+k vx0 T) - (d + dd T)
 d, dd = 8.0, 1.5                      # target 8 m away, receding at 1.5 m/s

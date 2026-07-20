@@ -10,13 +10,13 @@ BLUE, MAGENTA, GRAY = "#3B6FD4", "#D6336C", "#8A8A8A"
 BLUE_L, BLUE_D = "#9DB8E8", "#1E3F7E"          # sequential blues: speed low -> high
 mpl.rcParams.update({"font.size": 11, "axes.linewidth": 0.8})
 
-g, rho, cd = 9.8, 1.225, 0.47
+g, rho, cd = 9.8, 1.169, 0.47   # rho: 25 C standard-pressure air (official 2026)
 
 def k_of(d_m, m_kg):
     return 0.5 * rho * cd * np.pi * (d_m / 2) ** 2 / m_kg
 
-K17 = k_of(0.017, 0.0035)      # 17 mm, 3.5 g  -> 0.0187 /m
-K42 = k_of(0.0425, 0.041)      # 42 mm, 41 g   -> 0.0100 /m
+K17 = k_of(0.0168, 0.0032)     # 17 mm, 3.2 g  -> 0.0190 /m
+K42 = k_of(0.0425, 0.0445)     # 42 mm, 44.5 g -> 0.0088 /m
 print(f"k17={K17:.5f} /m  k42={K42:.5f} /m  ratio={K42/K17:.3f}")
 
 def vacuum_pitch(v0, d, h):
@@ -75,21 +75,35 @@ def miss_curve(v0, k):
         out.append((fly(v0, p, 0.0, d)[-1, 1] - fly(v0, p, k, d)[-1, 1]) * 100)
     return np.array(out)
 
-for v, c in [(15, BLUE_L), (25, BLUE), (30, BLUE_D)]:
+for v, c in [(15, BLUE_L), (20, BLUE), (25, BLUE_D)]:
     y = miss_curve(v, K17)
     ax2.plot(x, y, color=c, lw=2.0)
-    if v != 30:
-        ax2.annotate(f"17 mm, {v} m/s", xy=(x[-1], y[-1]),
-                     xytext=(-4, 6 if v == 15 else -14),
-                     textcoords="offset points", ha="right", color=c, fontsize=9)
-ax2.text(9.9, 2.6, "17 mm, 30 m/s", ha="right", color=BLUE_D, fontsize=9)
-y42 = miss_curve(16, K42)
+    ax2.annotate(f"17 mm, {v} m/s", xy=(x[-1], y[-1]),
+                 xytext=(-4, {15: 6, 20: -4, 25: -12}[v]),
+                 textcoords="offset points", ha="right", color=c, fontsize=9)
+y42 = miss_curve(12, K42)
 ax2.plot(x, y42, color=MAGENTA, lw=2.0, ls="--")
-ax2.annotate("42 mm, 16 m/s", xy=(x[-1], y42[-1]), xytext=(-4, 8),
+ax2.annotate("42 mm, 12 m/s", xy=(x[-1], y42[-1]), xytext=(-4, 8),
              textcoords="offset points", ha="right", color=MAGENTA, fontsize=9)
 ax2.axhline(6, color=GRAY, lw=1.0, ls=":")
 ax2.annotate("half armor height ~6 cm", xy=(0.6, 6), xytext=(0, 4),
              textcoords="offset points", color=GRAY, fontsize=9)
+
+# failure distance = where the miss curve crosses the 6 cm half-armor line
+xf = np.linspace(0.5, 12, 400)
+def fail_dist(v0, k, thr=6.0):
+    m_prev, d_prev = None, None
+    for d in xf:
+        m = (fly(v0, vacuum_pitch(v0, d, 0.0), 0.0, d)[-1, 1]
+             - fly(v0, vacuum_pitch(v0, d, 0.0), k, d)[-1, 1]) * 100
+        if m_prev is not None and m_prev < thr <= m:
+            return d_prev + (thr - m_prev) * (d - d_prev) / (m - m_prev)
+        m_prev, d_prev = m, d
+    return None
+print("failure distance (miss = 6 cm):")
+for v in (25, 20, 15):
+    print(f"  17 mm {v} m/s -> {fail_dist(v, K17):.2f} m")
+print(f"  42 mm 12 m/s -> {fail_dist(12, K42):.2f} m")
 ax2.set_xlabel("target distance (m)")
 ax2.set_ylabel("miss below target (cm)")
 ax2.set_title("When does drag matter?\nmiss if you aim with the vacuum model", fontsize=11)
