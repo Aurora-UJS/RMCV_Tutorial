@@ -454,7 +454,7 @@
   none,
   (name, number, body, ..args) => {
     showybox(
-      title: [*#name* #h(1fr) Definition #number],
+      title: [*#name* #h(1fr) 定义 #number],
       frame: (
         border-color: olive,
         title-color:  olive.lighten(30%),
@@ -473,7 +473,7 @@
   none,
   (name, number, body, ..args) => {
     showybox(
-      title: [*#name* #h(1fr) Example #number],
+      title: [*#name* #h(1fr) 例题 #number],
       frame: (
         border-color: purple,
         title-color:  purple.lighten(30%),
@@ -492,7 +492,7 @@
   none,
   (name, number, body, ..args) => {
     showybox(
-      title: [*#name* #h(1fr) Note #number],
+      title: [*#name* #h(1fr) 笔记 #number],
       frame: (
         border-color: blue,
         title-color:  blue.lighten(30%),
@@ -511,7 +511,7 @@
   none,
   (name, number, body, ..args) => {
     showybox(
-      title: [*#name* #h(1fr) Attention #number],
+      title: [*#name* #h(1fr) 注意 #number],
       frame: (
         border-color: rgb("#DC143C"),
         title-color:  rgb("#DC143C").lighten(30%),
@@ -530,7 +530,7 @@
   none,
   (name, number, body, ..args) => {
     showybox(
-      title: [*#name* #h(1fr) Quote #number],
+      title: [*#name* #h(1fr) 引述 #number],
       frame: (
         border-color: black,
         title-color:  black.lighten(30%),
@@ -549,7 +549,7 @@
   none,
   (name, number, body, ..args) => {
     showybox(
-      title: [*#name* #h(1fr) Theorem #number],
+      title: [*#name* #h(1fr) 定理 #number],
       frame: (
         border-color: navy,
         title-color:  navy.lighten(30%),
@@ -568,7 +568,7 @@
   none,
   (name, number, body, ..args) => {
     showybox(
-      title: [*#name* #h(1fr) Proposition #number],
+      title: [*#name* #h(1fr) 命题 #number],
       frame: (
         border-color: maroon,
         title-color:  maroon.lighten(30%),
@@ -588,7 +588,7 @@
   none,
   (name, number, body, ..args) => {
     showybox(
-      title: [*#name* #h(1fr) Hypothesis #number],
+      title: [*#name* #h(1fr) 猜想 #number],
       frame: (
         border-color: orange,
         title-color:  orange.lighten(10%),
