@@ -1,11 +1,12 @@
 == 工业相机
-
+#include "industrial_camera.typ"
 == 装甲板识别
-
+#include "armor_detection.typ"
 == 装甲板的跟踪
-
+#include "armor_tracking.typ"
 == 能量机关识别
-
+#include "rune_detection.typ"
 == 自瞄算法设计
-
+#include "auto_aim_design.typ"
 == 串口模块
+#include "serial_module.typ"
