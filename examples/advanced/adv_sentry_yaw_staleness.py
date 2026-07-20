@@ -3,9 +3,9 @@
 
 Setting (all numbers read out of SMBU pb2025_sentry_nav reality/nav2_params.yaml):
   controller_frequency : 20.0 Hz   -> one control period = 50 ms
-  init_spin_speed      : 3.14 rad/s
+  scan rate (assumed)  : 3 rad/s   <- gimbal yaw rate, NOT the chassis spin param
   velocity_smoother max_velocity[0] : 2.5 m/s
-and spin_speed 7.0 rad/s as used by the PublishSpinSpeed node in
+and a doubled scan rate of 6 rad/s. NOTE: init_spin_speed / PublishSpinSpeed are
 pb2025_sentry_behavior/behavior_trees/rmul_2025.xml.
 
 Model (derivation, not measurement):
@@ -34,8 +34,8 @@ GRAY = "#8A8A8A"
 
 V = 2.5          # m/s, velocity_smoother max_velocity[0]
 T_CTRL = 0.05    # s, 1 / controller_frequency (20 Hz)
-OMEGA_A = 3.14   # rad/s, init_spin_speed
-OMEGA_B = 7.0    # rad/s, PublishSpinSpeed in rmul_2025.xml
+OMEGA_A = 3.0    # rad/s, assumed gimbal scan rate (speed-reference-frame yaw rate)
+OMEGA_B = 6.0    # rad/s, same at doubled scan rate
 
 
 def rot(a):
@@ -48,7 +48,7 @@ def main():
         os.path.join(here, "..", "..", "chapters", "5.Advanced", "images",
                      "adv-sentry-yaw-staleness.png"))
 
-    delta = OMEGA_A * T_CTRL              # 0.157 rad = 9.0 deg
+    delta = OMEGA_A * T_CTRL              # 0.150 rad = 8.6 deg
     v_want = np.array([V, 0.0])
     v_exec = rot(delta) @ v_want
     err = v_exec - v_want
@@ -71,7 +71,7 @@ def main():
 
     arc = np.linspace(0, delta, 60)
     ax1.plot(1.05 * np.cos(arc), 1.05 * np.sin(arc), color=GRAY, lw=1.2)
-    ax1.text(1.18, 0.07, r"$\delta = \omega\,\Delta t = 9.0^\circ$",
+    ax1.text(1.18, 0.07, r"$\delta = \omega\,\Delta t = 8.6^\circ$",
              color=GRAY, fontsize=10)
 
     ax1.text(V * 0.52, -0.20, "intended  $v$  (world frame), 2.5 m/s",
@@ -100,8 +100,8 @@ def main():
 
     # ---------- right: error vs staleness ----------
     dt = np.linspace(0, 0.15, 400)
-    for omega, color, ls, tag in ((OMEGA_A, BLUE, "-", r"$\omega$ = 3.14 rad/s  (init_spin_speed)"),
-                                  (OMEGA_B, MAGENTA, "--", r"$\omega$ = 7.0 rad/s  (PublishSpinSpeed)")):
+    for omega, color, ls, tag in ((OMEGA_A, BLUE, "-", r"$\omega$ = 3 rad/s  (scan rate, assumed)"),
+                                  (OMEGA_B, MAGENTA, "--", r"$\omega$ = 6 rad/s  (twice as fast)")):
         e = 2 * V * np.sin(omega * dt / 2)
         ax2.plot(dt * 1000, e, color=color, ls=ls, lw=2.4, label=tag)
 
@@ -128,8 +128,8 @@ def main():
     ax2.grid(alpha=0.25)
     ax2.legend(loc="upper left", fontsize=9.5, framealpha=0.95)
 
-    fig.suptitle("Stale yaw in the cmd_vel rotation: 50 ms of staleness at 3.14 rad/s "
-                 "= 0.39 m/s sideways (16% of command)  [derived, not measured]",
+    fig.suptitle("Stale yaw in the cmd_vel rotation: 50 ms of staleness at a 3 rad/s scan rate "
+                 "= 0.37 m/s sideways (15% of command)  [derived, not measured]",
                  fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(out, dpi=150, bbox_inches="tight")
@@ -137,7 +137,7 @@ def main():
     print(f"delta={delta:.4f} rad = {np.degrees(delta):.2f} deg")
     print(f"|e|={err_mag:.4f} m/s  perp={err_perp:.4f}  para={err_para:.4f}  "
           f"ratio={err_mag / V * 100:.2f}%")
-    print(f"omega=7.0: |e|={2 * V * np.sin(OMEGA_B * T_CTRL / 2):.4f} m/s "
+    print(f"omega=6.0: |e|={2 * V * np.sin(OMEGA_B * T_CTRL / 2):.4f} m/s "
           f"({2 * V * np.sin(OMEGA_B * T_CTRL / 2) / V * 100:.1f}%)")
 
 
