@@ -142,6 +142,11 @@ g++ -O3 -march=native -fopt-info-vec -c adv_compile_flags_bench.cpp
 
 配套的 `adv_compile_flags_bench.cpp` 与 `adv_compile_flags_bench.py` 实现了这套普查：同一份源码用多组选项各编译一次，逐档反汇编计数再计时。你可以在自己的机器上跑它，但请先确认机器是空闲的。
 
+#figure(
+  image("images/adv-compile-flags.png", width: 100%),
+  caption: [同一段流水线在五组编译选项下的耗时（脚本 `adv_compile_flags_bench.py`；13 代 i7 ／ g++ 13.3 ／ 1440×1080 ／ `taskset` 钉核 ／ 每档 300 次取中位数。*换机器、换编译器、换负载，数字都会变，会变的是数字不是方法*）。读图规则：左图按三段工作拆开看时间去哪了——`-O0` 到 `-O2` 那一步是数量级的（$11.4 arrow.r 1.5$ ms），`-O2` 到 `-O3` 又快了四倍，主要来自蓝色那段（二值化，访存密集）被向量化。右图才是工程上真正要问的问题：*`-O2` 之后还剩多少*——因为没人会拿 `-O0` 上场，拿它当基准只会得到一个虚高的加速比。右图里 `-march=native` 那根柱子几乎贴着零线，正是本节的论点：它确实发出了 256 bit 指令，但这个负载卡在访存带宽上，宽指令无处施展。],
+)
+
 最后是代价，这一档不是白拿的：`-march=native` 编出来的二进制*绑定编译它的那台机器*。在带 AVX-512 的开发机上编好，拷到只有 AVX2 的车载 NUC 上运行，会直接 `SIGILL`（非法指令）崩溃——而且是启动就崩，不是偶发。所以要么在车上现编，要么老实写明确的目标（如 `-march=x86-64-v3`）而不是 `native`。
 
 顺带回收基础篇的一笔账：「基础篇」CMake 与构建系统一章给的那份顶层 `CMakeLists.txt` 模板，几个优化档都写了 `-march=native`——那是"在哪台机器上编就在哪台上跑"的写法。若你的构建机和车不是同一台，先在车上跑一句 `lscpu | grep avx2` 确认，有 AVX2 就把它换成 `-march=x86-64-v3`（该档等价于 AVX2 加 FMA 加 BMI2，不含 AVX-512）；若车上是 Celeron／Pentium 一类没有 AVX2 的低功耗 U，这一档同样会崩，老实退回默认基线。
