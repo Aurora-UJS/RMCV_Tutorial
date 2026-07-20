@@ -13,3 +13,6 @@ _test_*.typ
 # 构建产物已由 CI 生成部署（首次 CI 部署验证通过后，
 # 运行 `git rm main.pdf` 并取消下一行注释，让仓库不再追踪 PDF）
 # /main.pdf
+
+# 第三方参考资料（本地阅读用，不入库）
+/vol_robotics_foundations.pdf
