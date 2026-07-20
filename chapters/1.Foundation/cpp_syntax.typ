@@ -407,7 +407,7 @@ uint64_t h;  // 精确 64 位无符号整数
 
 ```cpp
 const double PI = 3.14159265358979;
-const int MAX_BULLET_SPEED = 30;  // 单位 m/s
+const int MAX_BULLET_SPEED = 25;  // 单位 m/s
 ```
 
 使用 `const` 声明的变量必须在声明时初始化，之后任何试图修改它的操作都会导致编译错误。这种编译期检查能够有效防止意外修改重要数据。

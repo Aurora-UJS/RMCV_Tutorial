@@ -1436,7 +1436,7 @@ endif()
 class BallisticSolverTest : public testing::Test {
 protected:
     void SetUp() override {
-        solver_ = std::make_unique<BallisticSolver>(28.0);  // 28 m/s 弹速
+        solver_ = std::make_unique<BallisticSolver>(24.0);  // 24 m/s 弹速
     }
     
     std::unique_ptr<BallisticSolver> solver_;
@@ -1953,7 +1953,7 @@ struct Armor {
     cv::Point2f center;     ///< 装甲板中心点（像素坐标）
     cv::Size2f size;        ///< 装甲板尺寸（像素）
     double confidence;      ///< 检测置信度，范围 [0, 1]
-    int id;                 ///< 装甲板编号（1-5 对应英雄到哨兵）
+    int id;                 ///< 装甲板编号（1-5：英雄/工程/三台步兵；哨兵、前哨站、基地用专用贴纸）
     TargetColor color;      ///< 装甲板颜色
 };
 ```
