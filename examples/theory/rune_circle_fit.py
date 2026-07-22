@@ -72,8 +72,8 @@ for ax, arc in zip(axes, arcs):
     ax.legend(loc="lower left", fontsize=7.5, framealpha=0.9)
 
 fig.suptitle(
-    f"Same {SIGMA:.0f} px noise, same {N_PTS} samples: a {arcs[0]}° arc leaves the center "
-    f"{ratio:.0f}x less certain than a {arcs[1]}° arc",
+    f"Seeded Kasa simulation: center RMS {results[arcs[0]][1]:.1f} px "
+    f"({arcs[0]}° arc) vs {results[arcs[1]][1]:.1f} px ({arcs[1]}° arc)",
     fontsize=11)
 fig.tight_layout(rect=[0, 0, 1, 0.93])
 

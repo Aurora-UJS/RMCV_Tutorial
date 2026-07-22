@@ -58,8 +58,8 @@ ax.plot(xx, a_r * xx + b_r, color=GREEN, lw=2.6, alpha=0.75,
 ax.set_xlabel("x"); ax.set_ylabel("y")
 ax.legend(loc="upper left", fontsize=8.5, framealpha=0.9)
 ax.set_title(
-    f"30% outliers: least squares is dragged {err_ls:.1f}° off; "
-    f"RANSAC agrees with truth to {err_r:.2f}°",
+    f"Seeded draw with 30% generated outliers: LS error {err_ls:.1f}°; "
+    f"RANSAC error {err_r:.2f}°",
     fontsize=11)
 fig.tight_layout()
 

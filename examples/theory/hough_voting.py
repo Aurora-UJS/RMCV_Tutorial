@@ -76,8 +76,8 @@ ax1.set_title("Accumulator: each point votes a sinusoid", fontsize=10)
 fig.colorbar(im, ax=ax1, label="votes", shrink=0.9)
 
 fig.suptitle(
-    f"Hough voting: {x_line.size} collinear points stack {votes} votes in one cell; "
-    f"{x_cl.size} clutter points never agree",
+    f"Seeded Hough example: {x_line.size} line points create a {votes}-vote peak "
+    f"among {x_cl.size} random clutter points",
     fontsize=11)
 fig.tight_layout(rect=[0, 0, 1, 0.94])
 
