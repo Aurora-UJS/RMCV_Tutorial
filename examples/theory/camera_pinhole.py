@@ -2,6 +2,10 @@
 # Generates chapters/2.Theory/images/theory-camera-pinhole.png
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from pathlib import Path
+
+OUTPUT = (Path(__file__).resolve().parents[2]
+          / "chapters/2.Theory/images/theory-camera-pinhole.png")
 
 BLUE, MAGENTA, GRAY = "#3B6FD4", "#D6336C", "#8A8A8A"
 mpl.rcParams.update({"font.size": 11, "axes.linewidth": 0.8})
@@ -23,7 +27,7 @@ ax.annotate("O (optical center)", (-0.08, -0.34), ha="right", fontsize=10)
 # real image plane (behind O, inverted image) -- drawn faint
 ax.plot([-f, -f], [-1.1, 1.1], color=GRAY, lw=1.2, ls=":")
 ax.plot([-f], [-y], "o", color=GRAY, ms=5)
-ax.plot([Y and -f, 0], [-y, 0], color=GRAY, lw=1.0, ls=":")
+ax.plot([-f, 0], [-y, 0], color=GRAY, lw=1.0, ls=":")
 ax.annotate("real image plane\n(inverted)", (-f, 1.2), ha="center", color=GRAY, fontsize=9)
 ax.annotate("$-y$", (-f - 0.12, -y - 0.05), ha="right", color=GRAY, fontsize=10)
 
@@ -64,6 +68,5 @@ ax.set_ylim(-1.35, 2.65)
 ax.set_aspect("equal")
 ax.axis("off")
 fig.tight_layout()
-fig.savefig("/home/neomelt/RMCV_Tutorial/chapters/2.Theory/images/theory-camera-pinhole.png",
-            dpi=150, bbox_inches="tight", facecolor="white")
+fig.savefig(OUTPUT, dpi=150, bbox_inches="tight", facecolor="white")
 print("saved theory-camera-pinhole.png")

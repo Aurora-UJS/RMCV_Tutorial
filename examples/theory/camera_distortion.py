@@ -4,6 +4,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from pathlib import Path
+
+OUTPUT = (Path(__file__).resolve().parents[2]
+          / "chapters/2.Theory/images/theory-camera-distortion.png")
 
 BLUE, GRAY = "#3B6FD4", "#B0B0B0"
 mpl.rcParams.update({"font.size": 11})
@@ -49,9 +53,8 @@ for ax, (title, coef) in zip(axes, cases):
 axes[0].plot([], [], color=GRAY, lw=0.7, label="ideal grid")
 axes[0].plot([], [], color=BLUE, lw=1.3, label="distorted")
 axes[0].legend(loc="lower left", fontsize=9, framealpha=0.9)
-fig.suptitle("Brown model: distortion bends straight lines, and grows away from the center",
+fig.suptitle("Brown-model examples with exaggerated coefficients on a normalized grid",
              fontsize=13, y=1.0)
 fig.tight_layout()
-fig.savefig("/home/neomelt/RMCV_Tutorial/chapters/2.Theory/images/theory-camera-distortion.png",
-            dpi=150, bbox_inches="tight", facecolor="white")
+fig.savefig(OUTPUT, dpi=150, bbox_inches="tight", facecolor="white")
 print("saved theory-camera-distortion.png")

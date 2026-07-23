@@ -1,4 +1,4 @@
-# 图：拆解基础篇的 mlp.onnx 数字分类器——三个真实候选的前向传播结果
+# 图：拆解基础篇的 mlp.onnx 数字分类器——三个仓库视频候选的前向结果
 # 复刻 examples/cpp/lightbar_pipeline.cpp 的提取流程（Python 版）：
 # 从 examples/test.mp4 的 7.0 s 帧提取灯条候选并配对，把候选区域透视矫正
 # 成 20x28 二值小图，喂给真实的 mlp.onnx，画出 9 类 softmax 概率。
@@ -6,12 +6,14 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
-REPO = "/home/neomelt/RMCV_Tutorial"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+OUTPUT = REPO_ROOT / "chapters/2.Theory/images/theory-dl-mlp-dissect.png"
 NAMES = ["1", "2", "3", "4", "5", "outpost", "guard", "base", "negative"]
 
 # --- 1) 取帧、二值化、找灯条（与基础篇 C++ 判据一致） ---
-cap = cv2.VideoCapture(f"{REPO}/examples/test.mp4")
+cap = cv2.VideoCapture(str(REPO_ROOT / "examples/test.mp4"))
 cap.set(cv2.CAP_PROP_POS_MSEC, 7000)
 ok, frame = cap.read()
 assert ok
@@ -59,7 +61,7 @@ for i in range(len(blues)):
         cands.append((left, right, "SMALL" if small else "LARGE"))
 
 # --- 3) 透视矫正成 20x28 二值图，跑真实的 mlp.onnx ---
-net = cv2.dnn.readNetFromONNX(f"{REPO}/examples/cpp/model/mlp.onnx")
+net = cv2.dnn.readNetFromONNX(str(REPO_ROOT / "examples/cpp/model/mlp.onnx"))
 results = []
 for left, right, typ in cands:
     light_len, warp_h = 12, 28
@@ -113,10 +115,9 @@ for col, k in enumerate(order):
     ax.set_yticks([0, 0.5, 1.0])
     ax.grid(axis="y", alpha=0.25, linewidth=0.5)
     if col == 0:
-        ax.set_ylabel("softmax probability", fontsize=9)
-fig.suptitle("mlp.onnx forward pass on three real candidates from the match video",
+        ax.set_ylabel("softmax output", fontsize=9)
+fig.suptitle("mlp.onnx outputs for three candidates from the repository video",
              fontsize=11.5)
 fig.tight_layout(rect=[0, 0, 1, 0.97])
-fig.savefig(f"{REPO}/chapters/2.Theory/images/theory-dl-mlp-dissect.png",
-            bbox_inches="tight")
+fig.savefig(OUTPUT, bbox_inches="tight")
 print("saved")

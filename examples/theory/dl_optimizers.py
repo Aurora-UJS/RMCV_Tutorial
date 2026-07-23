@@ -3,6 +3,10 @@
 # 产出：chapters/2.Theory/images/theory-dl-optimizers.png
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
+
+OUTPUT = (Path(__file__).resolve().parents[2]
+          / "chapters/2.Theory/images/theory-dl-optimizers.png")
 
 A, B = 0.01, 1.0          # 两个方向的曲率：w1 平缓，w2 陡峭
 
@@ -17,7 +21,7 @@ def grad(p):
 
 start = np.array([-9.0, 2.5])
 steps = 60
-lr = 1.8                   # 接近 GD 稳定上界 2/B：陡峭方向剧烈振荡，平缓方向蠕动
+lr = 1.8                   # 接近 GD 稳定上界 2/B：高曲率方向反复换向
 
 # 朴素梯度下降
 p = start.copy()
@@ -27,7 +31,7 @@ for _ in range(steps):
     traj_gd.append(p.copy())
 traj_gd = np.array(traj_gd)
 
-# 动量法：v 累积历史梯度，振荡分量相互抵消，一致分量越滚越快
+# 动量法：v 累积历史梯度，反复变号的分量会部分抵消
 p = start.copy()
 v = np.zeros(2)
 beta, lr_m = 0.9, 0.4
@@ -56,13 +60,12 @@ ax.plot(*start, "ks", ms=7, zorder=5)
 ax.annotate("start", start + [0.15, 0.18], fontsize=9)
 ax.plot(0, 0, "k*", ms=13, zorder=5)
 ax.annotate("minimum", (0.2, -0.35), fontsize=9)
-ax.set_title(f"Same start, {steps} steps: momentum reaches the bottom, "
-             "plain GD is still zigzagging", fontsize=11)
+ax.set_title(f"Same quadratic and start, {steps} updates: momentum ends at lower loss\n"
+             "with the learning rates shown in the script", fontsize=11)
 ax.set_xlabel("$w_1$ (flat direction)")
 ax.set_ylabel("$w_2$ (steep direction)")
 ax.legend(loc="lower right", fontsize=9, framealpha=0.9)
 ax.grid(alpha=0.2, linewidth=0.5)
 fig.tight_layout()
-fig.savefig("/home/neomelt/RMCV_Tutorial/chapters/2.Theory/images/theory-dl-optimizers.png",
-            bbox_inches="tight")
+fig.savefig(OUTPUT, bbox_inches="tight")
 print(f"final loss: GD = {L_gd:.4f}, momentum = {L_mo:.6f}")

@@ -1,10 +1,14 @@
-# Depth error caused by 1 px of armor-width measurement error, vs distance.
-# Z = fx*W/w  =>  |dZ/dw| = Z^2/(fx*W): quadratic growth with distance.
+# First-order depth sensitivity to image-width measurement, vs distance.
+# Z = fx*W/w  =>  |dZ/dw| = Z^2/(fx*W) under the fronto-parallel size model.
 # fx = 1739 px (6 mm lens, 3.45 um pixel), W = 135 mm (small) / 230 mm (large).
 # Generates chapters/2.Theory/images/theory-camera-depth.png
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from pathlib import Path
+
+OUTPUT = (Path(__file__).resolve().parents[2]
+          / "chapters/2.Theory/images/theory-camera-depth.png")
 
 BLUE, MAGENTA, GRAY = "#3B6FD4", "#D6336C", "#8A8A8A"
 mpl.rcParams.update({"font.size": 11})
@@ -27,7 +31,7 @@ ax.annotate("small armor (W=135 mm)", (6.1, dz_small[-60] + 1.5),
             color=BLUE, fontsize=11, rotation=38)
 ax.annotate("large armor (W=230 mm)", (6.6, dz_large[-40] - 2.2),
             color=MAGENTA, fontsize=11, rotation=26)
-ax.annotate("lateral error per px ($Z/f_x$)", (4.6, 1.0), color=GRAY, fontsize=10)
+ax.annotate("lateral scale per px ($Z/f_x$)", (4.6, 1.0), color=GRAY, fontsize=10)
 
 # annotated points on the small-armor curve
 for z0 in (2, 5, 8):
@@ -37,9 +41,9 @@ for z0 in (2, 5, 8):
                 color=BLUE, fontsize=10)
 
 ax.set_xlabel("distance Z (m)")
-ax.set_ylabel("depth error per 1 px width error (cm)")
-ax.set_title("Depth error per pixel grows as $Z^2/(f_x W)$ — "
-             "1.7 cm @2 m, 10.6 cm @5 m, 27 cm @8 m (small armor)",
+ax.set_ylabel("first-order depth sensitivity |dZ/dw| (cm/px)")
+ax.set_title("Fronto-parallel size model: local depth sensitivity $Z^2/(f_x W)$\n"
+             "not a bound on general four-point PnP error",
              fontsize=11.5)
 ax.set_xlim(1, 8)
 ax.set_ylim(0, 30)
@@ -48,6 +52,5 @@ ax.set_axisbelow(True)
 for s in ("top", "right"):
     ax.spines[s].set_visible(False)
 fig.tight_layout()
-fig.savefig("/home/neomelt/RMCV_Tutorial/chapters/2.Theory/images/theory-camera-depth.png",
-            dpi=150, bbox_inches="tight", facecolor="white")
+fig.savefig(OUTPUT, dpi=150, bbox_inches="tight", facecolor="white")
 print("saved theory-camera-depth.png")

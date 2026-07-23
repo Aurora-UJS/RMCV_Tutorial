@@ -3,6 +3,10 @@
 # 产出：chapters/2.Theory/images/theory-dl-nonlinearity.png
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
+
+OUTPUT = (Path(__file__).resolve().parents[2]
+          / "chapters/2.Theory/images/theory-dl-nonlinearity.png")
 
 rng = np.random.default_rng(7)
 
@@ -78,9 +82,8 @@ axes[0].set_ylabel("$x_2$")
 axes[0].legend(loc="upper left", fontsize=9, framealpha=0.9)
 axes[0].text(0.5, -0.45, "no straight line separates XOR", ha="center",
              fontsize=9, style="italic", color="#333333")
-axes[1].text(0.5, -0.45, "hidden layer bends the space", ha="center",
+axes[1].text(0.5, -0.45, "nonlinear hidden layer produces a curved boundary", ha="center",
              fontsize=9, style="italic", color="#333333")
 fig.tight_layout()
-fig.savefig("/home/neomelt/RMCV_Tutorial/chapters/2.Theory/images/theory-dl-nonlinearity.png",
-            bbox_inches="tight")
+fig.savefig(OUTPUT, bbox_inches="tight")
 print(f"acc linear = {acc_lin:.3f}, acc mlp = {acc_mlp:.3f}")
