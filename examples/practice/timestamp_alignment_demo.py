@@ -1,28 +1,32 @@
-# Timestamp alignment demo: why a static target grows a "tail" in the odom
-# frame when image/IMU timestamps are mismatched, and how an offset scan
-# recovers the true offset.
+# Timestamp alignment demo: how a timestamp mismatch spreads the reconstructed
+# position of a static target, and how an offset scan recovers an injected
+# constant delay under this simplified model.
 #
 # Setup (top view, x forward, y left, camera at gimbal origin):
 #   - target static in odom at (4, 0) m;
 #   - gimbal yaw sweeps sinusoidally: psi(t) = A sin(2*pi*f*t),
-#     A = 40 deg, f = 0.8 Hz -> peak omega = A*2*pi*f = 3.5 rad/s (~200 deg/s);
-#   - camera 100 fps; image stamp = exposure time + 6 ms (pipeline delay,
-#     the true offset the scan must find);
-#   - attitude arrives as a 1 kHz sample buffer, queried by interpolation
-#     (same structure as the ring buffer in the chapter);
+#     A = 20 deg, f = 1.6 Hz -> peak omega = A*2*pi*f = 3.5 rad/s (~200 deg/s);
+#   - camera 100 fps; image receipt stamp = exposure time + a constant 6 ms;
+#   - attitude sample times are treated as exact and stored in a 1 kHz buffer,
+#     so 6 ms is the relative offset that this scan is expected to recover;
 #   - PnP noise: sigma_depth = 15 mm (sub-pixel width error at 4 m),
 #     sigma_lateral = 2.3 mm (1 px at fx = 1739) -- chosen to match the
 #     magnitudes derived in the camera-model chapter.
 #
 # Output: chapters/3.Practice/images/practice-timestamp-alignment.png
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+OUTPUT = REPO_ROOT / "chapters/3.Practice/images/practice-timestamp-alignment.png"
 
 rng = np.random.default_rng(7)
 
 # --- scenario -------------------------------------------------------------
-A = np.deg2rad(40.0)          # sweep amplitude [rad]
-f = 0.8                       # sweep frequency [Hz]
+A = np.deg2rad(20.0)          # sweep amplitude [rad]
+f = 1.6                       # sweep frequency [Hz]
 w0 = 2 * np.pi * f
 t_d_true = 0.006              # image stamp lags exposure by 6 ms
 T_total = 6.0                 # s of data
@@ -32,11 +36,13 @@ p_odom = np.array([4.0, 0.0])  # static target, odom frame [m]
 yaw = lambda t: A * np.sin(w0 * t)
 
 # --- 1 kHz attitude buffer (what the serial thread would store) -----------
-t_imu = np.arange(0.0, T_total + 0.1, 1e-3)
+t_imu = np.arange(-0.1, T_total + 0.1, 1e-3)
 yaw_imu = yaw(t_imu)
 
 def yaw_lookup(t_query):
     """Interpolate attitude from the 1 kHz buffer (scalar yaw -> lerp == slerp)."""
+    if np.any(t_query < t_imu[0]) or np.any(t_query > t_imu[-1]):
+        raise ValueError("attitude query is outside the buffered interval")
     return np.interp(t_query, t_imu, yaw_imu)
 
 # --- camera frames --------------------------------------------------------
@@ -61,7 +67,7 @@ def reconstruct(offset):
                      s * p_cam[:, 0] + c * p_cam[:, 1]], axis=1)
 
 def rms_spread(pts):
-    """RMS distance to the cloud mean (truth-free metric, same as on the car)."""
+    """RMS distance to the cloud mean (the truth-free metric used by this scan)."""
     d = pts - pts.mean(axis=0)
     return np.sqrt(np.mean(np.sum(d**2, axis=1)))
 
@@ -70,7 +76,7 @@ p_aligned = reconstruct(t_d_true)   # offset applied
 rms_naive, rms_aligned = rms_spread(p_naive), rms_spread(p_aligned)
 
 # --- offset scan ----------------------------------------------------------
-offsets = np.arange(-4.0, 16.01, 0.25) * 1e-3
+offsets = np.arange(-5.0, 20.01, 0.25) * 1e-3
 scan = np.array([rms_spread(reconstruct(d)) for d in offsets])
 d_best = offsets[np.argmin(scan)]
 
@@ -80,8 +86,8 @@ print(f"RMS aligned       : {rms_aligned * 100:.1f} cm")
 print(f"scan minimum at   : {d_best * 1000:.2f} ms (true {t_d_true * 1000:.1f} ms)")
 
 # --- figure ---------------------------------------------------------------
-C_BAD = "#d1495b"    # misaligned (the misleading view)
-C_GOOD = "#1565c0"   # aligned (the truthful view)
+C_BAD = "#d1495b"    # uncorrected
+C_GOOD = "#1565c0"   # corrected with the injected offset
 HALF_ARMOR = 0.0675  # small armor half-width [m]
 
 fig, (axL, axR) = plt.subplots(1, 2, figsize=(10.5, 4.4),
@@ -93,18 +99,18 @@ dev_a = (p_aligned - p_odom) * 100
 axL.set_title(f"Static target in odom: RMS {rms_naive*100:.1f} cm "
               f"$\\to$ {rms_aligned*100:.1f} cm", fontsize=10.5)
 axL.plot(dev_n[:, 1], dev_n[:, 0], ".", color=C_BAD, ms=3, alpha=0.45,
-         label=f"offset = 0 (naive), RMS {rms_naive*100:.1f} cm")
+         label=f"offset = 0 (uncorrected), RMS {rms_naive*100:.1f} cm")
 axL.plot(dev_a[:, 1], dev_a[:, 0], ".", color=C_GOOD, ms=3, alpha=0.6,
          label=f"offset = 6 ms (aligned), RMS {rms_aligned*100:.1f} cm")
 axL.plot(0, 0, "*", color="#222222", ms=14, zorder=5)
 axL.annotate("true position", (0, 0), textcoords="offset points",
              xytext=(8, -14), fontsize=9, color="#222222")
-th = np.linspace(0, 2 * np.pi, 200)
-axL.plot(HALF_ARMOR * 100 * np.cos(th), HALF_ARMOR * 100 * np.sin(th),
-         "--", color="#888888", lw=1.2)
-axL.annotate("small-armor half-width 6.75 cm", (0, HALF_ARMOR * 100),
-             textcoords="offset points", xytext=(0, 5), fontsize=8.5,
-             color="#666666", ha="center")
+# Plate width constrains lateral miss, not depth error, so draw vertical bounds
+# rather than a radial "hit circle" in this lateral-versus-depth plot.
+axL.axvline(-HALF_ARMOR * 100, color="#888888", lw=1.2, ls="--")
+axL.axvline(HALF_ARMOR * 100, color="#888888", lw=1.2, ls="--")
+axL.annotate("nominal lateral half-width +/-6.75 cm", (0, 7.2),
+             fontsize=8.5, color="#666666", ha="center")
 axL.set_xlabel("lateral deviation y [cm]")
 axL.set_ylabel("depth deviation x [cm]")
 axL.set_aspect("equal")
@@ -112,17 +118,17 @@ axL.set_xlim(-12, 12); axL.set_ylim(-9, 9)
 axL.grid(alpha=0.25, lw=0.5)
 axL.legend(fontsize=8.5, loc="lower left", framealpha=0.9)
 
-# Right: offset scan, the U-curve
+# Right: offset scan, which is bowl-shaped near the injected value here
 axR.set_title(f"Offset scan: minimum at {d_best*1000:.1f} ms "
               f"(true {t_d_true*1000:.0f} ms)", fontsize=10.5)
 axR.plot(offsets * 1000, scan * 100, "-", color="#333333", lw=1.8)
 axR.axvline(t_d_true * 1000, color=C_GOOD, lw=1.2, ls="--")
 axR.plot(d_best * 1000, scan.min() * 100, "o", color=C_GOOD, ms=7)
-axR.annotate("PnP noise floor", (offsets[-1] * 1000, rms_aligned * 100),
-             textcoords="offset points", xytext=(-92, 6), fontsize=9,
-             color="#666666")
+axR.annotate("injected PnP-noise baseline", (offsets[-1] * 1000, rms_aligned * 100),
+             textcoords="offset points", xytext=(-6, 6), fontsize=9,
+             color="#666666", ha="right")
 axR.axhline(rms_aligned * 100, color="#999999", lw=1.0, ls=":")
-axR.annotate("naive (offset = 0)", (0, rms_naive * 100),
+axR.annotate("uncorrected (offset = 0)", (0, rms_naive * 100),
              textcoords="offset points", xytext=(8, 2), fontsize=9,
              color=C_BAD)
 axR.plot(0, rms_naive * 100, "s", color=C_BAD, ms=6)
@@ -131,6 +137,5 @@ axR.set_ylabel("RMS spread [cm]")
 axR.grid(alpha=0.25, lw=0.5)
 
 fig.tight_layout()
-out = "chapters/3.Practice/images/practice-timestamp-alignment.png"
-fig.savefig(out, dpi=150, bbox_inches="tight")
-print(f"saved {out}")
+fig.savefig(OUTPUT, dpi=150, bbox_inches="tight")
+print(f"saved {OUTPUT.relative_to(REPO_ROOT)}")
