@@ -1,7 +1,7 @@
 # Bandwidth budget of a 115200-baud serial link.
 # Left: occupancy = frame_size x rate vs the 11520 B/s ceiling (8N1: 10 bits/byte).
-# Right: a 48-byte frame occupies the wire for 4.17 ms -- a frame is not a point
-# event; at 200 Hz the pipe is busy 83% of the time and jitter has nowhere to hide.
+# Right: a 48-byte frame occupies the wire for 4.17 ms rather than arriving as a
+# point event; at 200 Hz only 0.83 ms of each nominal period remains unoccupied.
 # Output: chapters/3.Practice/images/practice-protocol-bandwidth.png
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,9 +26,9 @@ axL.set_title("115200 baud, 8N1 = 11520 bytes/s per direction", fontsize=10.5)
 axL.axhspan(100, 130, color="#9e9e9e", alpha=0.30, lw=0)
 axL.axhspan(70, 100, color="#bdbdbd", alpha=0.18, lw=0)
 axL.axhline(100, color="#424242", lw=1.2)
-axL.text(8, 113, "over capacity: queue grows without bound",
+axL.text(8, 113, "offered load exceeds the line rate",
          fontsize=8.5, color="#424242")
-axL.text(8, 84, "headroom zone: jitter starts to stack",
+axL.text(8, 84, "70-100%: inspect burst and scheduling margin",
          fontsize=8.5, color="#757575")
 
 axL.plot(f, occ_tx, color=C_TX, lw=2.2)
