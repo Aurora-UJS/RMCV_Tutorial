@@ -1,7 +1,6 @@
-# Energy-rune anatomy & recognition geometry, for the "rune detection" application chapter.
-# One schematic: five blades at 72 deg spacing around the R mark, colour-coded by state
-# (target / shot / unlit), with the radius geometry and the "rotate a detection by 72 deg
-# about R to seed the other blades" trick that a pure-traditional pipeline leans on.
+# Energy-rune geometry for the application chapter.
+# The diagram shows five blades at 72 deg spacing, an example state assignment,
+# and position hypotheses obtained by rotation about the estimated R center.
 # Output: chapters/4.Application/images/app-rune-geometry.png
 import numpy as np
 import matplotlib.pyplot as plt
@@ -28,7 +27,7 @@ ARM_W, ARM_H = 0.42, 0.26   # striking-armor frame size (tangential x radial)
 angles_deg = [90 + i * 72 for i in range(5)]
 states = ["target", "shot", "unlit", "unlit", "shot"]
 state_color = {"target": RED, "shot": ORANGE, "unlit": GRAY}
-state_label = {"target": "target (to hit)", "shot": "activated (already hit)", "unlit": "unlit"}
+state_label = {"target": "target candidate", "shot": "activated", "unlit": "unlit"}
 
 def draw_blade(ax, ang_deg, color, lit):
     a = np.deg2rad(ang_deg)
@@ -57,8 +56,7 @@ def draw_blade(ax, ang_deg, color, lit):
 target_c = None
 for ang, st in zip(angles_deg, states):
     # side bars light up only AFTER a blade is hit -> only "shot" blades get them.
-    # This is exactly the cue the contour-hierarchy test counts on:
-    # activated = 3 child contours (two side bars + strip), to-hit = 1.
+    # This example assumes three child contours after activation and one before.
     cx, cy = draw_blade(ax, ang, state_color[st], lit=(st == "shot"))
     if st == "target":
         target_c = (cx, cy)
@@ -94,23 +92,23 @@ arr = FancyArrowPatch((ring * np.cos(np.deg2rad(20)), ring * np.sin(np.deg2rad(2
                       color=MUTED, lw=1.8)
 ax.add_patch(arr)
 ax.text(ring * np.cos(np.deg2rad(-8)) + 0.12, ring * np.sin(np.deg2rad(-8)),
-        "rotation\n(random each round, fixed within it;\nthe two sides see opposite\nhandedness -> measure it online)",
+        "image-plane rotation\n(sign depends on viewpoint and\nimage convention; estimate it\nfrom consecutive observations)",
         fontsize=9.5, color=MUTED, va="center")
 
 # ---- "seed the others" annotation on the target arc
-ax.annotate("detect one blade,\nrotate +/-72 deg about R\nto seed the rest",
+ax.annotate("from one detected blade,\nrotate +/-72 deg about R\nto propose the others",
             xy=(0.60 * np.cos(a0) - 0.10, 0.60 * np.sin(a0)),
             xytext=(-1.95, 1.02), fontsize=9.5, color=INK, ha="left", va="center",
             arrowprops=dict(arrowstyle="->", color=INK, lw=1.1))
 
 # ---- the cue the hierarchy test actually counts: side bars present or not
 a_t = np.deg2rad(angles_deg[0])          # target blade (red), points up
-ax.annotate("no side bars yet = to hit\n(1 child contour)",
+ax.annotate("example target state\n(1 child contour)",
             xy=(0.13, 0.72 * np.sin(a_t)), xytext=(0.62, 1.30),
             fontsize=9.5, color=RED, ha="left", va="center",
             arrowprops=dict(arrowstyle="->", color=RED, lw=1.1))
 a_s = np.deg2rad(angles_deg[4])          # an activated blade (orange), lower right
-ax.annotate("side bars lit = already hit\n(3 child contours)",
+ax.annotate("example activated state\n(3 child contours)",
             xy=(0.74 * np.cos(a_s), 0.74 * np.sin(a_s) - 0.16),
             xytext=(1.06, 0.98),
             fontsize=9.5, color=ORANGE, ha="left", va="center",
@@ -121,15 +119,15 @@ handles = [plt.Line2D([0], [0], color=state_color[s], lw=3.0, label=state_label[
            for s in ["target", "shot", "unlit"]]
 ax.legend(handles=handles, loc="lower right", fontsize=9.5, frameon=True, framealpha=0.95)
 
-ax.set_title("Energy-rune anatomy: five blades at 72 deg around the R mark.\n"
-             "Vision must pick the one 'to-hit' blade, then localize its armor center at radius r.",
+ax.set_title("Energy-rune geometry: five blades at 72 deg around the R mark\n"
+             "Estimate the target blade, center R, and image-plane radius r.",
              fontsize=12.5, pad=10)
 ax.set_xlim(-2.05, 2.1)
 ax.set_ylim(-1.7, 1.55)
 ax.axis("off")
 
 fig.tight_layout()
-out = Path("chapters/4.Application/images/app-rune-geometry.png")
+out = Path(__file__).resolve().parents[2] / "chapters/4.Application/images/app-rune-geometry.png"
 out.parent.mkdir(parents=True, exist_ok=True)
 fig.savefig(out, dpi=150, bbox_inches="tight")
 print("wrote", out)
