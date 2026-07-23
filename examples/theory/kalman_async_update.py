@@ -1,6 +1,8 @@
-# Asynchronous-update CV Kalman filter demo for the aimbot landing section:
+# Asynchronous-update CV Kalman filter demo for the target-tracking section:
 # predict at 1 kHz, measure at 100 Hz, with a 0.6 s measurement dropout.
 # Generates chapters/2.Theory/images/theory-kalman-async-update.png
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -41,10 +43,13 @@ for k in range(len(t)):
     if k > 0 and k % meas_every == 0 and not drop[k]:
         z = x_true[k] + rng.normal(0.0, sigma_z)  # full update on measurement
         S = H @ P @ H.T + R
-        K = P @ H.T @ np.linalg.inv(S)
+        K = np.linalg.solve(S.T, (P @ H.T).T).T
         x = x + (K @ (np.array([z]) - H @ x)).ravel()
-        P = (np.eye(2) - K @ H) @ P
-        meas_t.append(t[k]); meas_z.append(z)
+        I_KH = np.eye(2) - K @ H
+        P = I_KH @ P @ I_KH.T + K @ R @ K.T
+        P = 0.5 * (P + P.T)
+        meas_t.append(t[k])
+        meas_z.append(z)
     est.append(x.copy()); sig.append(np.sqrt(np.diag(P)))
 est, sig = np.array(est), np.array(sig)
 
@@ -62,7 +67,8 @@ for ax in (ax1, ax2):
     ax.axvspan(1.2, 1.8, color=GRAY, alpha=0.18, lw=0)
 ax1.set_title(f"Predict-only through a 0.6 s dropout: drift reaches "
               f"{100*drift:.0f} cm, 3$\\sigma$ band opens to "
-              f"{100*sig_end:.0f} cm, then snaps back", fontsize=11.5)
+              f"{100*sig_end:.0f} cm; measurement updates then resume",
+              fontsize=11.5)
 
 ax1.fill_between(t, est[:, 0] - 3 * sig[:, 0], est[:, 0] + 3 * sig[:, 0],
                  color=BLUE, alpha=0.15, lw=0, label="$\\pm 3\\sigma$")
@@ -85,6 +91,7 @@ ax2.set_ylim(-1.4, 1.5)
 ax2.legend(loc="upper right", fontsize=9, framealpha=0.9)
 
 fig.tight_layout()
-fig.savefig("chapters/2.Theory/images/theory-kalman-async-update.png",
-            bbox_inches="tight")
+output = (Path(__file__).resolve().parents[2]
+          / "chapters/2.Theory/images/theory-kalman-async-update.png")
+fig.savefig(output, bbox_inches="tight")
 print("saved theory-kalman-async-update.png")
