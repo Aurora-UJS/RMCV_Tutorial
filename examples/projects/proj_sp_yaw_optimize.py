@@ -1,5 +1,5 @@
-# Reproduces sp_vision_25's optimize_yaw() search and measures what the code
-# comment "平衡不做yaw优化，因为pitch假设不成立" actually costs.
+# Mirrors the core grid search in sp_vision_25's optimize_yaw() for one
+# synthetic pose, then illustrates its sensitivity to a mismatched pitch prior.
 #
 # Geometry / constants are taken verbatim from the repository:
 #   tasks/auto_aim/solver.cpp:12-25   armor object points (big: 230 mm x 56 mm)
@@ -7,14 +7,13 @@
 #   tasks/auto_aim/solver.cpp:101-125 R_armor2world and the reprojection
 #   tasks/auto_aim/solver.cpp:196-218 SEARCH_RANGE = 140 deg, 1 deg step
 #   tasks/auto_aim/solver.cpp:259     cost = sum of the 4 corner L2 distances
-# Intrinsics and t_camera2gimbal come from configs/standard4.yaml.
-# R_camera2gimbal is idealised to the exact axis permutation that the calibrated
-# matrix in that YAML sits within ~2 deg of.
+# Intrinsics, distortion, and camera-to-gimbal extrinsics come from
+# configs/standard4.yaml. The target pose and corner-noise model are synthetic.
+# Position is held fixed while the yaw cost is evaluated, so this is not an
+# end-to-end reproduction of solvePnP, tracking, or field accuracy.
 #
-# Finding: with the correct pitch prior the cost has ONE minimum; as the prior
-# is violated a second, mirror-image minimum grows until the two are within a
-# pixel of each other, and corner noise starts picking the wrong one. That is
-# the quantitative content of the balanced-infantry early return.
+# In this chosen geometry, increasing pitch-prior mismatch introduces a second
+# local minimum and raises the chance of a large yaw error under corner noise.
 #
 # Generates chapters/6.Projects/images/proj-sp-yaw-optimize.png
 import cv2
@@ -23,7 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 BLUE, MAGENTA, GRAY = "#3B6FD4", "#D6336C", "#8A8A8A"
-GREEN, ORANGE, INK = "#2F9E44", "#E8890C", "#222222"
+ORANGE, INK = "#E8890C", "#222222"
 mpl.rcParams.update({"font.size": 10.0, "axes.linewidth": 0.9})
 
 DEG = np.pi / 180.0
@@ -43,7 +42,11 @@ K = np.array([[1851.7070167840545, 0, 721.12585328714192],
 DIST = np.array([-0.093662536083526302, 0.18945726820633155,
                  -0.00040424349861928674, -0.0040568403852123142, 0.0])
 
-R_CAM2GIM = np.array([[0.0, 0.0, 1.0], [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]])
+R_CAM2GIM = np.array([
+    [0.02823004230930648, -0.014076983590428133, 0.99950232778328707],
+    [-0.99954530259354468, -0.010995644138609872, 0.028076393521179785],
+    [0.010594940981141165, -0.99984045444409364, -0.014380990321749998],
+])
 T_HANDEYE = np.array([0.045517325957791413, 0.10544338092767802, 0.034649710880185793])
 
 SEARCH_RANGE = 140          # solver.cpp:200
@@ -52,8 +55,8 @@ PIX_NOISE = 1.0             # px, 1-sigma per corner coordinate
 TRIALS = 600
 YAW_TRUE = 25 * DEG
 
-# field-like pose: 4 m, 12 deg off the optical axis, 0.25 m above the gimbal,
-# gimbal itself yawed 10 deg. Deliberately NOT head-on -- see the note below.
+# Chosen synthetic pose: 4 m away, 12 deg off the optical axis, 0.25 m above
+# the gimbal, with the gimbal yawed by 10 deg.
 DIST_M, AZIM, HEIGHT, GIMBAL_YAW = 4.0, 12 * DEG, 0.25, 10 * DEG
 XYZ = np.array([DIST_M * np.cos(AZIM), DIST_M * np.sin(AZIM), HEIGHT])
 R_G2W = np.array([[np.cos(GIMBAL_YAW), -np.sin(GIMBAL_YAW), 0],
@@ -122,15 +125,15 @@ for p_deg, col, lw, lab in [(15, BLUE, 2.1, "true pitch 15 deg — prior is righ
 axA.axvline(YAW_TRUE / DEG, color=GRAY, ls="--", lw=1.2)
 axA.text(YAW_TRUE / DEG + 1.4, 20.5, "true yaw\n25 deg", color=GRAY,
          fontsize=8.8, linespacing=1.2)
-axA.annotate("mirror solution:\nthe competing minimum", xy=(-2.2, 6.6), xytext=(-19, 13.0),
+axA.annotate("secondary\nlocal minimum", xy=(-2.2, 6.6), xytext=(-19, 13.0),
              color=INK, fontsize=8.5, linespacing=1.25, ha="center",
              arrowprops=dict(arrowstyle="->", color=INK, lw=0.9))
 axA.set_ylim(-1.2, 26)
 axA.set_xlim(-32, 46)
-axA.set_xlabel("candidate armor yaw [deg]   (grid: gimbal yaw $\\pm$70 deg, 1 deg step)")
+axA.set_xlabel("candidate armor yaw [deg]   (code grid offsets: $-$70 ... +69 deg)")
 axA.set_ylabel("reprojection cost [px], sum of 4 corners")
-axA.set_title("A. a right prior leaves one minimum; a wrong one grows a second\n"
-              "— brute force finds it, but the margin collapses to ~1 px", fontsize=10.4)
+axA.set_title("A. reprojection objective under pitch-prior mismatch\n"
+              "one synthetic pose; target position held fixed", fontsize=10.4)
 axA.legend(fontsize=8.4, loc="upper left", framealpha=0.95)
 axA.grid(alpha=0.25, lw=0.6)
 
@@ -146,8 +149,8 @@ for p in pitch_scan:
     rms.append(np.sqrt(np.mean(err ** 2)))
 
 axB.plot(pitch_scan, flip, "-", color=MAGENTA, lw=2.2,
-         label=f"picked the mirror ($|$err$|>$10 deg), {TRIALS} trials")
-axB.set_ylabel("wrong-minimum rate [%]", color=MAGENTA)
+         label=f"large yaw error ($|$err$|>$10 deg), {TRIALS} trials")
+axB.set_ylabel("large-yaw-error rate [%]", color=MAGENTA)
 axB.tick_params(axis="y", colors=MAGENTA)
 axB.set_ylim(-3, 78)
 
@@ -159,12 +162,12 @@ axB2.set_ylim(-1, 26)
 
 axB.axvline(15, color=GRAY, ls="--", lw=1.2)
 axB.text(15.9, 40, "prior assumes\npitch = 15 deg", color=GRAY, fontsize=8.8, linespacing=1.2)
-axB.axvspan(-25, -2, color=MAGENTA, alpha=0.07)
-axB.text(-13.5, 25, "assumption\nviolated", color=MAGENTA, fontsize=8.8, ha="center",
+axB.axvspan(-25, 0, color=MAGENTA, alpha=0.07)
+axB.text(-13.5, 25, "prior error\n$\\geq$15 deg", color=MAGENTA, fontsize=8.8, ha="center",
          linespacing=1.2)
 axB.set_xlabel(f"true armor pitch [deg]   (corner noise {PIX_NOISE:.0f} px, 1$\\sigma$)")
-axB.set_title("B. so a violated prior turns the yaw estimate into a coin flip —\n"
-              "which is why balanced infantry returns before optimize_yaw()", fontsize=10.4)
+axB.set_title("B. grid-search sensitivity in the same synthetic pose\n"
+              "Monte Carlo corner noise; not field-accuracy data", fontsize=10.4)
 h1, l1 = axB.get_legend_handles_labels()
 h2, l2 = axB2.get_legend_handles_labels()
 axB.legend(h1 + h2, l1 + l2, fontsize=8.4, loc="upper left", framealpha=0.95)
@@ -176,13 +179,11 @@ fig.savefig(out, dpi=150, bbox_inches="tight")
 print("wrote", out)
 
 # --- numbers quoted in the prose -----------------------------------------
-print("\npitch_true  wrong-min%%   RMS err [deg]   (noise %.1f px, %d trials)"
+print("\npitch_true  large-err%%   RMS err [deg]   (noise %.1f px, %d trials)"
       % (PIX_NOISE, TRIALS))
 for p in (15, 5, 0, -10, -15):
-    m0 = reproject(YAW_TRUE, p * DEG)
-    meas = m0[None, :, :] + rng.normal(0.0, PIX_NOISE, (TRIALS, 4, 2))
-    err = (search_batch(meas) - YAW_TRUE) / DEG
-    print(f"{p:8d}  {100*np.mean(np.abs(err)>10):9.1f}  {np.sqrt(np.mean(err**2)):12.1f}")
+    i = int(np.flatnonzero(np.isclose(pitch_scan, p))[0])
+    print(f"{p:8d}  {flip[i]:9.1f}  {rms[i]:12.1f}")
 
 print("\nnoise-free local minima of the cost:")
 for p in (15, 0, -15):
