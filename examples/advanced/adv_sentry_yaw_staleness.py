@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Why a stale gimbal yaw wrecks the cmd_vel rotation (sentry decision chapter).
+"""Velocity error caused by a stale yaw in the cmd_vel transform.
 
-Setting (all numbers read out of SMBU pb2025_sentry_nav reality/nav2_params.yaml):
+Parameters:
   controller_frequency : 20.0 Hz   -> one control period = 50 ms
-  scan rate (assumed)  : 3 rad/s   <- gimbal yaw rate, NOT the chassis spin param
   velocity_smoother max_velocity[0] : 2.5 m/s
-and a doubled scan rate of 6 rad/s. NOTE: init_spin_speed / PublishSpinSpeed are
-pb2025_sentry_behavior/behavior_trees/rmul_2025.xml.
+Both values come from SMBU pb2025_sentry_nav reality/nav2_params.yaml. The
+reference-frame yaw rates, 3 rad/s and a doubled 6 rad/s, are assumptions. They
+are not the chassis angular velocity set by init_spin_speed or PublishSpinSpeed.
 
 Model (derivation, not measurement):
   The node sends R(-psi)*v to the chassis; the chassis re-applies R(psi).
@@ -93,8 +93,8 @@ def main():
     ax1.axvline(0, color="0.85", lw=0.8, zorder=0)
     ax1.set_xlabel("world x  [m/s]")
     ax1.set_ylabel("world y  [m/s]")
-    ax1.set_title("One control period of stale yaw = the whole velocity\n"
-                  "rotated by 9$^\\circ$, error almost purely sideways",
+    ax1.set_title("A 50 ms yaw offset rotates the velocity by 8.6$^\\circ$\n"
+                  "in this two-dimensional model",
                   fontsize=11.5)
     ax1.grid(alpha=0.18)
 
@@ -123,13 +123,12 @@ def main():
     ax2.set_ylim(0, 1.95)
     ax2.set_xlabel("yaw staleness  $\\Delta t$  [ms]")
     ax2.set_ylabel("velocity error  $|R(\\delta)v - v|$  [m/s]")
-    ax2.set_title("Error grows with how old the yaw is,\n"
-                  "not with how good the controller is", fontsize=11.5)
+    ax2.set_title("Velocity error versus yaw time offset", fontsize=11.5)
     ax2.grid(alpha=0.25)
     ax2.legend(loc="upper left", fontsize=9.5, framealpha=0.95)
 
-    fig.suptitle("Stale yaw in the cmd_vel rotation: 50 ms of staleness at a 3 rad/s scan rate "
-                 "= 0.37 m/s sideways (15% of command)  [derived, not measured]",
+    fig.suptitle("Yaw time offset in a velocity transform: 50 ms at 3 rad/s gives "
+                 "0.37 m/s error (15% of command)  [derived, not measured]",
                  fontsize=12.5, y=0.995)
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(out, dpi=150, bbox_inches="tight")
