@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""OpenCV 线程数扫描：墙上时间躺平、CPU 时间起飞。
+"""OpenCV 线程数扫描：同时比较墙上时间与聚合 CPU 时间。
 
 产出 chapters/5.Advanced/images/adv-perf-opencv-threads.png。
 
-数据来源：本次实测，一次典型预处理（cvtColor + GaussianBlur + threshold，
-1280x1024），环境为 g++ 13.3.0 / OpenCV 4.6.0（TBB 后端）/
-Intel i7-13790F（16C24T，P/E 异构）/ Linux 7.0.0-28。
-表中数字与书里同名表格逐项一致；本脚本只负责把它画出来，不重新采样——
-重跑请在空闲机器上，并把 DATA 换成新结果。
+数据来源：一份遗留的本地汇总记录，负载注明为 cvtColor + GaussianBlur +
+threshold（1280x1024），环境注明为 g++ 13.3.0 / OpenCV 4.6.0（TBB）/
+Intel i7-13790F（16C24T，P/E 异构）/ Linux 7.0.0-28。仓库没有保留采样
+程序、原始样本、样本量、统计量定义或“聚合 CPU 时间”的具体计时接口。
+本脚本只负责重绘 DATA，不能重新采样；若要复测，应另写基准并替换整组记录。
 
-注意 24 是本机 cv::getNumThreads() 的默认返回值，即"不设置"的那一档。
-4→8 线程是一个平台期：墙上时间基本不动，CPU 时间近乎翻倍。该档起伏在噪声内，不作因果归因。
+注意 24 是本机 cv::getNumThreads() 的返回值，即"不设置"的测试档。
+4 是供整机联合负载继续复测的本机候选，不是跨平台推荐值。
 
 配色沿用全书：蓝 #3B6FD4、品红 #D6336C、灰 #8A8A8A。
 """
@@ -38,18 +38,18 @@ th, wall, cpu = DATA[:, 0], DATA[:, 1], DATA[:, 2]
 speedup = wall[0] / wall
 eff = speedup / th
 
-RECOMMEND, DEFAULT = 4, 24
+CANDIDATE, LOCAL_DEFAULT = 4, 24
 x = np.arange(len(th))
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.6, 4.8))
 
 # ---------------- 左：墙上时间 vs CPU 时间 ----------------
 ax1.fill_between(x, wall, cpu, color=MAGENTA, alpha=0.10, zorder=1,
-                 label="CPU burnt for nothing")
+                 label="difference between CPU and wall time")
 ax1.plot(x, wall, color=BLUE, lw=2.6, marker="o", ms=7, mec="white", mew=1.2,
-         label="wall time (what you feel)", zorder=3)
+         label="wall time", zorder=3)
 ax1.plot(x, cpu, color=MAGENTA, lw=2.6, marker="s", ms=7, mec="white", mew=1.2,
-         label="CPU time (what you steal)", zorder=3)
+         label="aggregate CPU time", zorder=3)
 
 for xi, w, c in zip(x, wall, cpu):
     ax1.annotate(f"{w:.3f}", (xi, w), xytext=(0, -15), textcoords="offset points",
@@ -57,12 +57,12 @@ for xi, w, c in zip(x, wall, cpu):
     ax1.annotate(f"{c:.3f}", (xi, c), xytext=(0, 8), textcoords="offset points",
                  ha="center", fontsize=8, color=MAGENTA)
 
-i_rec, i_def = list(th).index(RECOMMEND), list(th).index(DEFAULT)
+i_rec, i_def = list(th).index(CANDIDATE), list(th).index(LOCAL_DEFAULT)
 ax1.axvline(i_rec, color=BLUE, ls="-", lw=1.1, alpha=0.55, zorder=0)
 ax1.axvline(i_def, color=GRAY, ls="--", lw=1.3, alpha=0.9, zorder=0)
-ax1.text(i_rec - 0.08, 2.35, "recommended\nsetNumThreads(4)", color=BLUE,
+ax1.text(i_rec - 0.08, 2.35, "candidate to remeasure\nsetNumThreads(4)", color=BLUE,
          fontsize=8.5, va="top", ha="right")
-ax1.text(i_def - 0.10, 3.95, "OpenCV default\n(all 24 logical cores)", color=GRAY,
+ax1.text(i_def - 0.10, 3.95, "retained default value\n24 threads", color=GRAY,
          fontsize=8.5, va="top", ha="right")
 
 ax1.annotate(f"4 -> 24 threads:  wall -{(1 - wall[i_def]/wall[i_rec])*100:.0f}%,"
@@ -81,7 +81,8 @@ ax1.set_axisbelow(True)
 for s in ("top", "right"):
     ax1.spines[s].set_visible(False)
 ax1.legend(loc="upper left", frameon=False, fontsize=9)
-ax1.set_title("(a) wall time flattens, CPU time keeps climbing", fontsize=10.5, loc="left")
+ax1.set_title("(a) wall and aggregate CPU time in the retained record",
+              fontsize=10.5, loc="left")
 
 # ---------------- 右：加速比与并行效率 ----------------
 ax2.plot(x, speedup, color=BLUE, lw=2.6, marker="o", ms=7, mec="white", mew=1.2,
@@ -102,7 +103,7 @@ for xi, e in zip(x, eff):
                   textcoords="offset points", ha="center", fontsize=8.5,
                   color=MAGENTA)
 
-ax2.annotate("4 to 8: wall time flat, CPU time 2x\n(no speedup for twice the cores)",
+ax2.annotate("4 to 8 in the retained record:\nsimilar wall time, CPU time about 1.9x",
              xy=(3, speedup[3] + 0.12), xytext=(1.05, 5.35), fontsize=9, color="k",
              arrowprops=dict(arrowstyle="->", color="k", lw=1.1))
 
@@ -116,12 +117,13 @@ for s in ("top",):
 h1, l1 = ax2.get_legend_handles_labels()
 h2, l2 = ax2b.get_legend_handles_labels()
 ax2.legend(h1 + h2, l1 + l2, loc="lower left", frameon=False, fontsize=8.5)
-ax2.set_title("(b) efficiency collapses: 88% at 4 threads, 19% at 24",
+ax2.set_title("(b) speed-up and derived parallel efficiency",
               fontsize=10.5, loc="left")
 
-fig.suptitle("OpenCV default = all cores: 21% faster locally, 3.4x the CPU globally",
+fig.suptitle("Retained OpenCV thread-scan summary for one workload",
              fontsize=12.5, fontweight="bold", x=0.012, ha="left", y=0.995)
 fig.tight_layout(rect=(0, 0, 1, 0.93))
 OUT.parent.mkdir(parents=True, exist_ok=True)
-fig.savefig(OUT, dpi=150)
+fig.savefig(OUT, dpi=150, metadata={"Software": "Matplotlib"})
+plt.close(fig)
 print("wrote", OUT)

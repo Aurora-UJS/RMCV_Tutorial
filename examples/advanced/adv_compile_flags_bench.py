@@ -1,177 +1,265 @@
 #!/usr/bin/env python3
-"""编译选项的真实收益：把同一份 C++ 源码用不同选项编译，各跑一遍，画出结果。
+"""Render or remeasure the compile-option benchmark used by the book.
 
-产出 chapters/5.Advanced/images/adv-compile-flags.png。
-配套源码 adv_compile_flags_bench.cpp。
+The default mode renders the fixed record printed in the chapter, so rebuilding
+the figure does not silently replace source data with a noisy local run. Pass
+``--measure`` to compile and run the C++ workload on the current machine.
 
-诚实性说明（这些必须随图一起进书）：
-  - 结果强依赖机器与编译器，脚本会把两者打印出来并写进图里；
-  - 每档取中位数与 p99，不取平均——实时系统里平均值最没用；
-  - -march=native 生成的二进制换机器可能直接非法指令崩溃，收益不是白拿的；
-  - 这是一段刻意挑选的、对向量化友好的负载，真实工程的加速比通常更小。
+Output: chapters/5.Advanced/images/adv-compile-flags.png
+Workload: examples/advanced/adv_compile_flags_bench.cpp
 """
-import subprocess, shutil, platform, statistics, sys, os
+
+import argparse
+import os
+import platform
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
-import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
 
 BLUE, MAGENTA, GRAY = "#3B6FD4", "#D6336C", "#8A8A8A"
-mpl.rcParams.update({"font.size": 11, "axes.linewidth": 0.8})
+mpl.rcParams.update({"font.size": 10.5, "axes.linewidth": 0.8})
 
 HERE = Path(__file__).resolve().parent
 SRC = HERE / "adv_compile_flags_bench.cpp"
 OUT = HERE.parent.parent / "chapters" / "5.Advanced" / "images" / "adv-compile-flags.png"
-BUILD = Path(os.environ.get("BENCH_TMP", "/tmp")) / "rmcv_flag_bench"
-BUILD.mkdir(parents=True, exist_ok=True)
+BUILD = Path(os.environ.get("RMCV_BENCH_TMP", "/tmp")) / "rmcv_flag_bench"
 
-REPS = 300
-PIN_CPU = os.environ.get("BENCH_CPU", "2")   # 钉到固定核，避免调度迁移污染中位数
-
-# (标签, 编译选项)。顺序即图中从左到右的顺序。
+DEFAULT_REPS = 300
 CONFIGS = [
-    ("-O0",                 ["-O0"]),
-    ("-O2",                 ["-O2"]),
-    ("-O3",                 ["-O3"]),
-    ("-O3 -march=native",   ["-O3", "-march=native"]),
-    ("-O3 -march -flto",    ["-O3", "-march=native", "-flto"]),
+    ("-O0", ["-O0"]),
+    ("-O2", ["-O2"]),
+    ("-O3", ["-O3"]),
+    ("-O3 -march=native", ["-O3", "-march=native"]),
+    ("-O3 -march=native -flto", ["-O3", "-march=native", "-flto"]),
 ]
+
+# Fixed summary from the environment stated in performance_tuning.typ; the raw
+# samples are not retained. Segment medians are rounded for plotting, while
+# total_med and total_p99 summarize each measured iteration's total.
+RECORDED_RESULTS = [
+    {"label": "-O0", "med": [6.06, 3.22, 2.16], "total_med": 11.45, "total_p99": 13.21},
+    {"label": "-O2", "med": [0.61, 0.72, 0.16], "total_med": 1.49, "total_p99": 1.69},
+    {"label": "-O3", "med": [0.04, 0.16, 0.16], "total_med": 0.36, "total_p99": 0.38},
+    {"label": "-O3 -march=native", "med": [0.05, 0.18, 0.17], "total_med": 0.40, "total_p99": 0.42},
+    {"label": "-O3 -march=native -flto", "med": [0.05, 0.18, 0.17], "total_med": 0.40, "total_p99": 0.42},
+]
+RECORDED_ENV = (
+    "i7-13790F | g++ 13.3.0 | 1440x1080 | CPU 2 | "
+    "20 warm-ups + 300 measured iterations"
+)
 
 
 def cpu_model() -> str:
     try:
-        for line in open("/proc/cpuinfo"):
-            if line.startswith("model name"):
-                return line.split(":", 1)[1].strip()
+        with open("/proc/cpuinfo", encoding="utf-8") as cpuinfo:
+            for line in cpuinfo:
+                if line.startswith("model name"):
+                    return line.split(":", 1)[1].strip()
     except OSError:
         pass
     return platform.processor() or "unknown CPU"
 
 
 def gxx_version() -> str:
-    out = subprocess.run(["g++", "--version"], capture_output=True, text=True).stdout
-    return out.splitlines()[0] if out else "g++ ?"
+    proc = subprocess.run(["g++", "--version"], capture_output=True, text=True, check=False)
+    return proc.stdout.splitlines()[0] if proc.stdout else "g++ ?"
 
 
-def vector_census(flags):
-    """数编译产物里各宽度的向量指令条数。
+def selected_cpu() -> str | None:
+    requested = os.environ.get("RMCV_BENCH_CPU")
+    if requested is not None:
+        return requested
+    if hasattr(os, "sched_getaffinity"):
+        allowed = sorted(os.sched_getaffinity(0))
+        if allowed:
+            return str(allowed[0])
+    return None
 
-    这一步是**确定性**的：反汇编不受 CPU 负载、频率、调度影响，
-    因此哪怕计时数据被噪声污染，这张普查表依然可信。
-    它回答的是机制问题——编译器到底有没有为你的循环发更宽的指令。
+
+def vector_census(label: str, flags: list[str]) -> dict[str, int]:
+    """Count disassembly lines mentioning each vector-register width.
+
+    These are not instruction counts and do not identify whether a line belongs
+    to the benchmark hot path. They are only a coarse generated-code check.
     """
-    obj = BUILD / "probe.o"
-    # 先删掉上一档的产物：若本档编译失败，objdump 会读到陈旧的 .o 而给出
-    # 看似合理的错误计数（这类"上一档的数字"极难自查，务必别省这一行）。
-    obj.unlink(missing_ok=True)
-    subprocess.run(["g++", "-std=c++17", *flags, "-c", str(SRC), "-o", str(obj)], check=True)
-    dis = subprocess.run(["objdump", "-d", str(obj)], capture_output=True, text=True).stdout
-    return {w: sum(1 for l in dis.splitlines() if f"%{w}" in l) for w in ("xmm", "ymm", "zmm")}
-
-
-def run_one(label, flags):
-    exe = BUILD / ("bench_" + label.replace(" ", "_").replace("-", "").replace("=", ""))
-    cmd = ["g++", "-std=c++17", *flags, str(SRC), "-o", str(exe)]
-    subprocess.run(cmd, check=True)
-    # 钉核跑。不钉的话调度迁移会把中位数打飞——实测同一档的中位数能在
-    # 0.41 与 0.64 ms 之间跳（56% 波动），足以把两个编译档的真实差距淹掉。
-    run_cmd = [str(exe), str(REPS)]
-    if shutil.which("taskset"):
-        run_cmd = ["taskset", "-c", PIN_CPU, *run_cmd]
-    proc = subprocess.run(run_cmd, capture_output=True, text=True, check=True)
-    rows = [list(map(float, l.split())) for l in proc.stdout.strip().splitlines()]
-    a = np.array(rows)                      # (REPS, 3): threshold / conv / reduce
-    total = a.sum(axis=1)
+    tag = label.replace(" ", "_").replace("-", "").replace("=", "")
+    probe = BUILD / f"probe_{tag}"
+    probe.unlink(missing_ok=True)
+    subprocess.run(
+        ["g++", "-std=c++17", *flags, str(SRC), "-o", str(probe)],
+        check=True,
+    )
+    disassembly = subprocess.run(
+        ["objdump", "-d", str(probe)], capture_output=True, text=True, check=True
+    ).stdout
     return {
-        "label": label,
-        "med": np.median(a, axis=0),        # 每段中位数
-        "total_med": float(np.median(total)),
-        "total_p99": float(np.percentile(total, 99)),
+        width: sum(f"%{width}" in line for line in disassembly.splitlines())
+        for width in ("xmm", "ymm", "zmm")
     }
 
 
-def main():
-    if shutil.which("g++") is None:
-        sys.exit("需要 g++")
+def run_one(label: str, flags: list[str], reps: int, pin_cpu: str | None) -> dict:
+    tag = label.replace(" ", "_").replace("-", "").replace("=", "")
+    executable = BUILD / f"bench_{tag}"
+    subprocess.run(
+        ["g++", "-std=c++17", *flags, str(SRC), "-o", str(executable)],
+        check=True,
+    )
+
+    run_cmd = [str(executable), str(reps)]
+    if pin_cpu is not None and shutil.which("taskset"):
+        run_cmd = ["taskset", "-c", pin_cpu, *run_cmd]
+    proc = subprocess.run(run_cmd, capture_output=True, text=True, check=True)
+    rows = [list(map(float, line.split())) for line in proc.stdout.splitlines() if line.strip()]
+    if len(rows) != reps or any(len(row) != 3 for row in rows):
+        raise RuntimeError(f"{label}: expected {reps} rows with three fields")
+
+    samples = np.asarray(rows)
+    totals = samples.sum(axis=1)
+    return {
+        "label": label,
+        "med": np.median(samples, axis=0),
+        "total_med": float(np.median(totals)),
+        "total_p99": float(np.percentile(totals, 99)),
+    }
+
+
+def measure(reps: int) -> tuple[list[dict], str]:
+    if shutil.which("g++") is None or shutil.which("objdump") is None:
+        sys.exit("--measure requires g++ and objdump")
+    BUILD.mkdir(parents=True, exist_ok=True)
+    pin_cpu = selected_cpu() if shutil.which("taskset") else None
     print(f"CPU: {cpu_model()}")
-    print(f"{gxx_version()}   reps={REPS}")
+    print(f"{gxx_version()} | reps={reps} | pinned CPU={pin_cpu or 'none'}")
 
     results = []
     for label, flags in CONFIGS:
         try:
-            r = run_one(label, flags)
-        except subprocess.CalledProcessError as e:
-            print(f"  [跳过] {label}: 编译或运行失败 ({e})")
+            result = run_one(label, flags, reps, pin_cpu)
+            census = vector_census(label, flags)
+        except (subprocess.CalledProcessError, RuntimeError) as exc:
+            print(f"  [skip] {label}: {exc}")
             continue
-        results.append(r)
-        seg = "  ".join(f"{n}={v:.2f}" for n, v in zip(("thr", "conv", "red"), r["med"]))
-        print(f"  {label:22s} 中位 {r['total_med']:6.2f} ms   p99 {r['total_p99']:6.2f} ms   [{seg}]")
-
+        results.append(result)
+        segments = "  ".join(
+            f"{name}={value:.3f}" for name, value in zip(("thr", "conv", "red"), result["med"])
+        )
+        print(
+            f"  {label:30s} median {result['total_med']:.3f} ms  "
+            f"p99 {result['total_p99']:.3f} ms  [{segments}]  registers={census}"
+        )
     if not results:
-        sys.exit("没有任何配置跑通")
+        sys.exit("no benchmark configuration completed")
 
-    base = results[0]["total_med"]           # 以 -O0 为基准算加速比
-    o2 = next((r for r in results if r["label"] == "-O2"), None)
+    environment = (
+        f"{cpu_model()} | {gxx_version()} | 1440x1080 | "
+        f"CPU {pin_cpu or 'not pinned'} | 20 warm-ups + {reps} measured iterations"
+    )
+    return results, environment
 
-    labels = [r["label"] for r in results]
-    xs = np.arange(len(results))
-    seg_names = ["threshold (memory-bound)", "conv3x3 (compute-bound)", "reduce (dependency)"]
+
+def render(results: list[dict], environment: str) -> None:
+    baseline = next((result for result in results if result["label"] == "-O0"), None)
+    if baseline is None:
+        raise ValueError("results must contain the -O0 baseline")
+    base = baseline["total_med"]
+    o2 = next((result for result in results if result["label"] == "-O2"), None)
+    labels = [result["label"] for result in results]
+    x_positions = np.arange(len(results))
+    segment_names = ["threshold", "3x3 convolution", "reduction"]
     colors = [BLUE, MAGENTA, GRAY]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.5, 4.8))
-
-    # 左：堆叠条形，看每档总耗时的构成
-    bottom = np.zeros(len(results))
-    for k, (name, c) in enumerate(zip(seg_names, colors)):
-        vals = np.array([r["med"][k] for r in results])
-        ax1.bar(xs, vals, 0.6, bottom=bottom, color=c, label=name,
-                edgecolor="white", linewidth=0.6)
-        bottom += vals
-    for i, r in enumerate(results):
-        ax1.annotate(f"{r['total_med']:.1f} ms\n{base / r['total_med']:.1f}x",
-                     xy=(i, bottom[i]), xytext=(0, 5), textcoords="offset points",
-                     ha="center", fontsize=9)
-    ax1.set_xticks(xs); ax1.set_xticklabels(labels, rotation=18, ha="right", fontsize=9)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.8, 5.2))
+    bottoms = np.zeros(len(results))
+    for index, (name, color) in enumerate(zip(segment_names, colors)):
+        values = np.asarray([result["med"][index] for result in results])
+        ax1.bar(
+            x_positions, values, 0.6, bottom=bottoms, color=color,
+            label=name, edgecolor="white", linewidth=0.6,
+        )
+        bottoms += values
+    p99_values = np.asarray([result["total_p99"] for result in results])
+    total_medians = np.asarray([result["total_med"] for result in results])
+    for index, result in enumerate(results):
+        ax1.annotate(
+            f"{result['total_med']:.2f} ms\n{base / result['total_med']:.1f}x vs -O0",
+            xy=(index, p99_values[index]), xytext=(0, 5), textcoords="offset points",
+            ha="center", fontsize=8.5,
+        )
+    ax1.vlines(
+        x_positions, total_medians, p99_values, color="black", linewidth=0.9,
+        label="total p99",
+    )
+    ax1.scatter(x_positions, p99_values, marker="_", s=90, color="black", zorder=4)
+    ax1.set_xticks(x_positions)
+    ax1.set_xticklabels(labels, rotation=18, ha="right", fontsize=8.5)
     ax1.set_ylabel("median time per frame (ms)")
-    ax1.set_ylim(0, bottom.max() * 1.22)
-    ax1.set_title("Where the time goes, per compile config\n(speedup vs -O0 on top)", fontsize=11)
+    ax1.set_ylim(0, max(bottoms.max(), p99_values.max()) * 1.12)
+    ax1.set_title("(a) segment medians by compile option", fontsize=10.5, loc="left")
     ax1.legend(fontsize=8.5, frameon=False)
     ax1.spines[["top", "right"]].set_visible(False)
 
-    # 右：只看 -O2 之后还剩多少收益——这才是工程上要回答的问题
     if o2 is not None:
-        rest = [r for r in results if r["label"] != "-O0"]
-        rx = np.arange(len(rest))
-        gain = [(o2["total_med"] / r["total_med"] - 1) * 100 for r in rest]
-        bars = ax2.bar(rx, gain, 0.55, color=[BLUE if g >= 0 else MAGENTA for g in gain],
-                       edgecolor="white", linewidth=0.6)
-        for b, g in zip(bars, gain):
-            ax2.annotate(f"{g:+.1f}%", xy=(b.get_x() + b.get_width() / 2, g),
-                         xytext=(0, 4 if g >= 0 else -13), textcoords="offset points",
-                         ha="center", fontsize=9)
+        later = [result for result in results if result["label"] != "-O0"]
+        right_x = np.arange(len(later))
+        gains = [(o2["total_med"] / result["total_med"] - 1) * 100 for result in later]
+        bars = ax2.bar(
+            right_x, gains, 0.55,
+            color=[BLUE if gain >= 0 else MAGENTA for gain in gains],
+            edgecolor="white", linewidth=0.6,
+        )
+        for bar, gain in zip(bars, gains):
+            ax2.annotate(
+                f"{gain:+.1f}%", xy=(bar.get_x() + bar.get_width() / 2, gain),
+                xytext=(0, 4 if gain >= 0 else -13), textcoords="offset points",
+                ha="center", fontsize=8.5,
+            )
         ax2.axhline(0, color=GRAY, lw=1.0)
-        ax2.set_xticks(rx)
-        ax2.set_xticklabels([r["label"] for r in rest], rotation=18, ha="right", fontsize=9)
-        ax2.set_ylabel("further gain over -O2 (%)")
-        ax2.set_title("The real question: what is left after -O2?\n"
-                      "(-O0 is not a baseline anyone ships)", fontsize=11)
+        ax2.set_xticks(right_x)
+        ax2.set_xticklabels(
+            [result["label"] for result in later], rotation=18, ha="right", fontsize=8.5
+        )
+        ax2.set_ylabel("speedup relative to -O2 (%)")
+        ax2.set_title("(b) measured speedup after -O2", fontsize=10.5, loc="left")
         ax2.spines[["top", "right"]].set_visible(False)
-        lo, hi = min(gain + [0]), max(gain + [0])
-        ax2.set_ylim(lo - max(4, abs(lo) * 0.35), hi + max(6, abs(hi) * 0.35))
+        low, high = min(gains + [0]), max(gains + [0])
+        ax2.set_ylim(low - max(4, abs(low) * 0.35), high + max(6, abs(high) * 0.25))
 
-    fig.suptitle(f"{cpu_model()}  |  {gxx_version()}  |  1440x1080, median of {REPS} runs",
-                 fontsize=9, color=GRAY, y=0.015)
-    fig.tight_layout(rect=(0, 0.035, 1, 1))
+    fig.suptitle(
+        "Compile-option benchmark for one fixed workload",
+        fontsize=12.5, fontweight="bold", x=0.012, ha="left", y=0.985,
+    )
+    fig.text(0.5, 0.012, environment, ha="center", va="bottom", fontsize=8, color=GRAY)
+    fig.tight_layout(rect=(0, 0.065, 1, 0.94))
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(OUT, dpi=150)
-    print(f"\n写出 {OUT}")
+    fig.savefig(OUT, dpi=150, metadata={"Software": "Matplotlib"})
+    plt.close(fig)
+    print(f"wrote {OUT}")
 
-    print("\n给正文用的数字：")
-    for r in results:
-        print(f"  {r['label']:22s} 中位 {r['total_med']:6.2f} ms  p99 {r['total_p99']:6.2f} ms  "
-              f"vs -O0 {base / r['total_med']:.2f}x"
-              + (f"  vs -O2 {o2['total_med'] / r['total_med']:.3f}x" if o2 else ""))
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--measure", action="store_true",
+        help="compile and measure on this machine instead of rendering the fixed record",
+    )
+    parser.add_argument("--reps", type=int, default=DEFAULT_REPS)
+    args = parser.parse_args()
+    if args.reps <= 0:
+        parser.error("--reps must be positive")
+
+    if args.measure:
+        results, environment = measure(args.reps)
+    else:
+        results = [dict(result, med=np.asarray(result["med"])) for result in RECORDED_RESULTS]
+        environment = RECORDED_ENV
+        print("rendering the fixed chapter record; pass --measure to rerun the benchmark")
+    render(results, environment)
 
 
 if __name__ == "__main__":
