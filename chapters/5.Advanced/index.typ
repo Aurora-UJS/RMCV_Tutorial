@@ -4,5 +4,5 @@
 #include "sentry_decision.typ"
 == 性能优化技巧
 #include "performance_tuning.typ"
-== 实战经验与坑点总结
+== 实战经验与常见问题
 #include "field_experience.typ"

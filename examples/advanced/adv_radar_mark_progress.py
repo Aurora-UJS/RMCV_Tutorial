@@ -4,14 +4,14 @@
 # explicit numbers.  We implement the recursion literally and check every number.
 #
 # Bottom panel -- DERIVED (not measured).  Same recursion driven by two error
-# processes that share the *same mean accuracy* but differ in temporal structure:
-#   (a) scattered : the bad judgements sit one at a time at random positions
-#   (b) clustered : the *same number* of bad judgements, grouped into runs of 5
+# processes that share the same error count but differ in temporal structure:
+#   (a) scattered : error positions are sampled uniformly without replacement
+#   (b) clustered : the same number of errors is inserted in blocks of 5
 # Both arms are handed an identical error count, so only the arrangement differs.
 # Measured quantity: median time to first reach P = 100 (the vulnerability line).
-# Result: clustered is *faster*, because x accumulates only along an unbroken
-# accurate streak; sum(1..14) = 105, so a clean 14-judgement streak alone clears
-# the line (2.8 s at 5 Hz) and that floor dominates everything else.
+# Under these generated sequences, the clustered construction reaches P = 100
+# sooner at the reported accuracy levels.  This is a simulation comparison, not
+# a claim about every process with clustered errors.
 #
 # Recursion (manual Table 5-21), x updated first, then P, then P clamped [0,150]:
 #   accurate      : x += 1.0 if previous in {acc, semi} else x = 1.0
@@ -71,7 +71,7 @@ times = ([0.2 * (i + 1) for i in range(15)]
          + [5.2, 5.4])
 P_hist = run(seq)
 
-# the 15 numbers printed verbatim in the manual, keyed by index in `seq`
+# The 15 checkpoints listed in the manual, keyed by index in `seq`.
 MANUAL = {0: 1.0, 1: 3.0, 2: 6.0, 3: 10.0, 4: 15.0, 14: 120.0,
           15: 119.2, 16: 117.6, 17: 115.2, 18: 112.0, 19: 108.0,
           20: 103.2, 21: 97.6, 22: 98.6, 23: 100.6}
@@ -90,7 +90,7 @@ ax0.plot([0.0] + times, [0.0] + P_hist, color=BLUE, lw=2.2, zorder=3)
 ax0.plot(times, P_hist, "o", ms=4.2, color=BLUE, mec="white", mew=0.8, zorder=4)
 ax0.plot([times[i] for i in MANUAL], [MANUAL[i] for i in MANUAL], "x",
          ms=8.5, mew=2.0, color=INK, zorder=6, ls="none",
-         label="value printed verbatim in the manual")
+         label="checkpoint listed in the manual")
 
 for y, lab in ((100.0, "P = 100  vulnerability begins"),
                (120.0, "P = 120  20% vulnerability")):
@@ -101,7 +101,7 @@ ax0.set_xlim(0, 5.6)
 ax0.set_ylim(0, 154)
 ax0.set_xlabel("time  [s]")
 ax0.set_ylabel("tracking progress  P")
-ax0.set_title("Reproducing the manual's worked example — all %d printed values match"
+ax0.set_title("Manual worked example — this implementation reproduces %d listed checkpoints"
               % len(MANUAL), fontsize=11.4, fontweight="bold", color=INK, pad=9)
 ax0.legend(loc="lower right", frameon=False, fontsize=9.2)
 ax0.grid(True, axis="y", color=GRAY, alpha=0.22, lw=0.7)
@@ -120,7 +120,7 @@ def n_bad_of(a):
 
 
 def scattered(a):
-    """Same error count, positions uniformly permuted (one at a time)."""
+    """Same error count, with positions sampled uniformly without replacement."""
     out = np.array([ACC] * N, dtype=object)
     nb = n_bad_of(a)
     if nb:
@@ -165,22 +165,22 @@ t_sc, t_cl = np.asarray(t_sc), np.asarray(t_cl)
 FLOOR = 14 / RATE       # sum(1..14) = 105 >= 100 -> 14 consecutive judgements
 ax1.axhline(FLOOR, color=GRAY, lw=1.2, ls=(0, (5, 3)), zorder=2)
 ax1.text(60.4, FLOOR - 0.5,
-         "hard floor %.1f s: 14 consecutive accurate judgements\n"
-         "already give 1+2+…+14 = 105" % FLOOR,
+         "from P = x = 0: 14 accurate judgements take %.1f s\n"
+         "and give 1+2+…+14 = 105" % FLOOR,
          ha="left", va="top", fontsize=8.6, color=GRAY, fontweight="bold",
          linespacing=1.25)
 
 ax1.plot(accs * 100, t_sc, color=BLUE, lw=2.4, marker="o", ms=4.5,
          mec="white", mew=0.8, zorder=4,
-         label="errors spread one at a time")
+         label="errors at uniformly sampled positions")
 ax1.plot(accs * 100, t_cl, color=MAGENTA, lw=2.4, marker="s", ms=4.2,
          mec="white", mew=0.8, zorder=4,
-         label="same errors, grouped into runs of %d" % BURST)
+         label="same count, inserted in %d-event blocks" % BURST)
 ax1.fill_between(accs * 100, t_cl, t_sc, where=t_sc >= t_cl, color=GRAY,
                  alpha=0.18, lw=0, zorder=1)
 
 j = int(np.argmin(np.abs(accs - 0.80)))
-ax1.annotate("at 80%%: %.1f s vs %.1f s\nsame error rate, %.1f× the wait"
+ax1.annotate("at 80%%: %.1f s vs %.1f s\n%.1f× in these generated sequences"
              % (t_sc[j], t_cl[j], t_sc[j] / t_cl[j]),
              (accs[j] * 100, t_sc[j]), textcoords="offset points",
              xytext=(14, 8), ha="left", fontsize=8.8, color=INK,
@@ -191,8 +191,8 @@ ax1.set_xlim(59, 101)
 ax1.set_ylim(0, max(t_sc) * 1.22)
 ax1.set_xlabel("mean fraction of judgements landing in the 'accurate' band  [%]")
 ax1.set_ylabel("median time to reach P = 100  [s]")
-ax1.set_title("DERIVED, not measured: what P rewards is the longest unbroken streak\n"
-              "same error rate, errors merely spread thin → far slower to reach vulnerability",
+ax1.set_title("Controlled simulation: equal error counts, different temporal arrangements\n"
+              "5 Hz, 60 s sequences; median first time reaching P = 100 over 800 trials",
               fontsize=11.4, fontweight="bold", color=INK, pad=9)
 ax1.legend(loc="upper right", frameon=False, fontsize=9.2)
 ax1.grid(True, color=GRAY, alpha=0.22, lw=0.7)

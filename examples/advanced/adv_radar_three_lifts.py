@@ -1,4 +1,4 @@
-"""同一个像素，三种"抬升到三维"的方法给出三个不同的场地坐标。
+"""比较同一个像素在三种场地模型下的投影结果。
 
 侧视剖面（X-Z 平面）上做纯几何推导，非实测：
   相机架在 (0, H)，场地由一段平地（z=0）和一块高地（z=Zp）拼成。
@@ -6,7 +6,7 @@
 
   ① 单张平地单应  = 射线与 z=0 假想水平面求交
   ② 分层单应      = 先判层，再与该层平面求交（判对 → 与 ③ 重合；判错 → 退化成 ①）
-  ③ 网格射线求交  = 射线与真实场地剖面求交
+  ③ 网格射线求交  = 射线与简化场地剖面求交
 
 输出：chapters/5.Advanced/images/adv-radar-three-lifts.png
 """
@@ -42,7 +42,7 @@ def hit_plane(x_t, z_t, z_plane):
 
 
 def hit_mesh(x_t, z_t):
-    """射线与真实剖面求交：先试高地台面，落在高地范围内则命中，否则落到地面。"""
+    """射线与建模剖面求交：先试高地台面，落在高地范围内则命中，否则落到地面。"""
     x_on_plat = hit_plane(x_t, z_t, ZP)
     if x_on_plat >= X_EDGE:
         return x_on_plat, ZP
@@ -65,7 +65,7 @@ prof_x = [0, X_EDGE, X_EDGE, X_FAR]
 prof_z = [0, 0, ZP, ZP]
 ax.fill_between(prof_x, prof_z, -1.9, color=GRAY, alpha=0.20, zorder=1)
 ax.plot(prof_x, prof_z, color=DARKGRAY, lw=2.4, zorder=4,
-        label="true field profile (flat + 0.4 m platform)")
+        label="modeled field profile (flat + 0.4 m platform)")
 
 # 假想水平面
 ax.plot([0, X_FAR], [0, 0], color=GRAY, lw=1.2, ls=(0, (6, 4)), zorder=3,
@@ -76,7 +76,7 @@ ax.plot([0], [H], marker="o", ms=11, color=DARKGRAY, zorder=6)
 ax.annotate(f"camera  $h$ = {H} m", xy=(0, H), xytext=(0.5, H + 0.42),
             fontsize=11, color=DARKGRAY, weight="bold")
 
-# 实线段：光心 → 真实场地命中点；虚线段：穿过场地的"虚拟延长"，只为画出 (1) 的落点
+# 实线段：光心 → 模型命中点；虚线段：穿过场地的"虚拟延长"，只为画出 (1) 的落点
 ax.plot([0, XT], [H, ZP], color=BLUE, lw=2.4, alpha=0.9, zorder=5,
         label="ray of ONE pixel (robot's ground-contact pixel)")
 ray_end = x1 * 1.02
@@ -84,11 +84,11 @@ ax.plot([XT, ray_end], [ZP, H + (ZP - H) * ray_end / XT], color=BLUE, lw=1.6,
         alpha=0.55, ls=(0, (4, 3)), zorder=5,
         label="virtual extension (ray already hit the field here)")
 
-# 真值（车身示意 + 星标）
+# 模型设定的接触点（车身示意 + 星标）
 ax.plot([XT, XT], [ZP, ZP + 0.62], color=DARKGRAY, lw=7, alpha=0.30,
         solid_capstyle="butt", zorder=4)
 ax.plot([XT], [ZP], marker="*", ms=19, color=DARKGRAY, zorder=8)
-ax.annotate("TRUE contact point\n$x$ = 14.00 m", xy=(XT, ZP),
+ax.annotate("modeled contact point\n$x$ = 14.00 m", xy=(XT, ZP),
             xytext=(XT - 4.2, ZP + 1.05), fontsize=10.5, color=DARKGRAY,
             ha="center", weight="bold",
             arrowprops=dict(arrowstyle="->", color=DARKGRAY, lw=1.2))
@@ -102,8 +102,8 @@ ax.annotate(f"(1) flat homography\n$x$ = {x1:.2f} m", xy=(x1, 0.02),
 # ②/③ 命中点（重合）
 ax.plot([x3], [z3], marker="s", ms=16, mfc="none", mec=GRAY, mew=2.8, zorder=9)
 ax.plot([x3], [z3], marker="o", ms=8, color=MAGENTA, zorder=10)
-ax.annotate("(2) layered homography  =  (3) ray x mesh\n"
-            "$x$ = 14.00 m   (both exact here)",
+ax.annotate("(2) layered homography  =  (3) ray-mesh intersection\n"
+            "$x$ = 14.00 m   (both match the model here)",
             xy=(x3 + 0.12, z3 - 0.06), xytext=(7.2, -1.35), fontsize=10.5,
             color=MAGENTA, ha="center", weight="bold",
             arrowprops=dict(arrowstyle="->", color=MAGENTA, lw=1.2))
@@ -120,8 +120,8 @@ ax.set_xlim(-0.8, X_FAR)
 ax.set_ylim(-1.9, 3.45)
 ax.set_xlabel("horizontal distance from radar  $x$  [m]")
 ax.set_ylabel("height  $z$  [m]")
-ax.set_title("Same pixel, three ways to lift it into 3D  —  flat-plane assumption "
-             f"is off by {err1:.2f} m on a {ZP} m platform",
+ax.set_title("One pixel projected with three terrain models  —  the flat-plane estimate "
+             f"differs by {err1:.2f} m in this {ZP} m platform example",
              fontsize=12.5, weight="bold", pad=10)
 ax.legend(loc="upper right", fontsize=8.8, framealpha=0.94,
           borderpad=0.5, labelspacing=0.42)
@@ -141,7 +141,7 @@ ax2.plot(xs, e_flat, color=GRAY, lw=6.0, alpha=0.35, ls=(0, (2, 2)), zorder=3,
 ax2.plot(xs, e_ray + 0.02, color=GRAY, lw=6.0, alpha=0.55, zorder=4,
          label="(2) layered homography, RIGHT layer")
 ax2.plot(xs, e_ray, color=MAGENTA, lw=2.2, zorder=6,
-         label="(3) ray x mesh  (no layer decision needed)")
+         label="(3) ray-mesh intersection  (uses modeled surface)")
 
 ax2.axhline(0.8, color=DARKGRAY, lw=1.4, ls=(0, (5, 3)), zorder=2)
 ax2.text(X_FAR - 0.2, 0.86, "rule: 0.8 m = accurate threshold", ha="right",
@@ -158,10 +158,10 @@ ax2.annotate(f"the case drawn above:\n{err1:.2f} m at $x$ = {XT:.0f} m",
 
 ax2.set_xlim(X_EDGE, X_FAR)
 ax2.set_ylim(-0.35, 5.6)
-ax2.set_xlabel("target's true horizontal distance from radar  [m]")
+ax2.set_xlabel("modeled target distance from radar  [m]")
 ax2.set_ylabel("horizontal position error  [m]")
-ax2.set_title("Read it: the layer decision is the whole game — get it right and "
-              "(2) equals (3); get it wrong and (2) equals (1)",
+ax2.set_title("Layered homography depends on region selection: in this example, "
+              "the correct layer matches the modeled mesh",
               fontsize=12, weight="bold", pad=10)
 ax2.legend(loc="upper left", fontsize=9.2, framealpha=0.94, ncol=2)
 ax2.grid(alpha=0.22, ls=":")
@@ -176,4 +176,4 @@ out = os.path.normpath(os.path.join(out_dir, "adv-radar-three-lifts.png"))
 fig.savefig(out, dpi=150, bbox_inches="tight")
 print("saved:", out)
 print(f"  flat-homography hit x = {x1:.4f} m,  error = {err1:.4f} m")
-print(f"  ray x mesh      hit x = {x3:.4f} m,  error = {err3:.4f} m")
+print(f"  ray-mesh        hit x = {x3:.4f} m,  error = {err3:.4f} m")
