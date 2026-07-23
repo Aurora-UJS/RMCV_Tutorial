@@ -1,8 +1,8 @@
 == 工业相机
 #include "industrial_camera.typ"
-== 装甲板识别
+== 装甲板检测与识别
 #include "armor_detection.typ"
-== 装甲板的跟踪
+== 装甲板跟踪
 #include "armor_tracking.typ"
 == 能量机关识别
 #include "rune_detection.typ"

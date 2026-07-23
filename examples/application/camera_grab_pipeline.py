@@ -1,11 +1,9 @@
-"""SDK grab pipeline + auto-reconnect state flow for an industrial camera.
+"""Vendor-neutral SDK grab pipeline and bounded recovery state flow.
 
-Draws the canonical path from SDK init to a cv::Mat, plus the capture-thread
-loop with its failure -> stop/start recovery branch.  The structure follows
-the common Daheng/Galaxy ROS2 driver pattern (MIT/Apache): a blocking enumerate
-loop until a camera appears, an explicit "turn OFF auto-exposure/gain then set
-fixed values" step, Bayer demosaic on every frame, and a bounded reconnect that
-gives up after N consecutive failures.
+The diagram separates a successful borrowed-buffer-to-owned-cv::Mat path from
+error classification and threshold-based recovery.  Error classes, thresholds,
+parameter names, and reopen behavior must be adapted to the camera SDK and
+tested device.
 
 Output: chapters/4.Application/images/app-camera-grab-pipeline.png
 """
@@ -42,58 +40,64 @@ def arrow(x1, y1, x2, y2, color="#333333", text=None, tx=0, ty=0, ls="-"):
 
 
 # ---- setup column (left) ----
-box(6, 86, 30, 9, "GXInitLib()\ninit SDK", BLUE, BLUE_E, weight="bold")
-box(6, 70, 30, 10, "enumerate devices\n(block until found)", BLUE, BLUE_E)
-box(6, 54, 30, 9, "open by index / SN", BLUE, BLUE_E)
+box(6, 86, 30, 9, "initialize camera SDK", BLUE, BLUE_E, weight="bold")
+box(6, 70, 30, 10, "enumerate devices + select serial\n(no match: report + backoff)", BLUE, BLUE_E, fs=9)
+box(6, 54, 30, 9, "open selected device", BLUE, BLUE_E)
 box(2, 34, 38, 15,
-    "configure once\n• auto-exposure/gain OFF, set fixed\n"
-    "• white balance  • PixelFormat=BayerRG8\n• trigger mode (free-run / hard)",
+    "configure / reapply after reopen\n• lock validated exposure and gain\n"
+    "• lock white balance  • set PixelFormat\n• set and read back trigger mode",
     BLUE, BLUE_E, fs=9)
-box(6, 20, 30, 9, "AcquisitionStart", GREEN, GREEN_E, weight="bold")
+box(6, 20, 30, 9, "start acquisition", GREEN, GREEN_E, weight="bold")
 
 arrow(21, 86, 21, 80)
 # self loop on enumerate (left side, curved)
 ax.add_patch(FancyArrowPatch((6, 73), (6, 77), connectionstyle="arc3,rad=-1.1",
              color=GREY_E, arrowstyle="-|>", mutation_scale=12, lw=1.3))
-ax.text(-3.6, 75, "no cam\nwait 1s", ha="center", va="center", fontsize=7.5, color=GREY_E)
+ax.text(-3.6, 75, "no device\nbackoff", ha="center", va="center", fontsize=7.5, color=GREY_E)
 arrow(21, 70, 21, 63)
 arrow(21, 54, 21, 49)
 arrow(21, 34, 21, 29)
 
 # ---- capture loop column (right) ----
 box(58, 78, 36, 9, "capture thread loop", GREY, GREY_E, weight="bold")
-box(58, 62, 36, 9, "GXGetImage(timeout)", GREEN, GREEN_E)
-box(58, 44, 40, 11,
-    "Bayer → BGR demosaic\nDxRaw8toRGB24 / cvtColor", GREEN, GREEN_E, fs=9)
-box(60, 28, 36, 9, "publish  →  cv::Mat\nfail_count = 0", GREEN, GREEN_E, fs=9)
-box(58, 8, 40, 10,
-    "AcquisitionStop + Start\nfail_count++   (soft recover)", RED, RED_E, fs=9)
+box(58, 62, 36, 9, "get SDK image buffer (timeout)", GREEN, GREEN_E, fs=9)
+box(58, 43, 40, 12,
+    "validate pixel format + row stride\nborrowed Bayer → owned BGR\ncvtColor / SDK converter",
+    GREEN, GREEN_E, fs=8.7)
+box(60, 26, 36, 11,
+    "return SDK buffer\npublish / enqueue owned cv::Mat\nfail_count = 0",
+    GREEN, GREEN_E, fs=8.7)
+box(58, 7, 40, 12,
+    "classify + log SDK result\nexpected trigger wait → retry\nrecoverable error → fail_count++",
+    RED, RED_E, fs=8.7)
 
 # start -> capture loop
 arrow(36, 24.5, 58, 82, color=GREEN_E)
 arrow(76, 78, 76, 71)
 # get image -> success down
 arrow(76, 62, 76, 55, color=GREEN_E, text="ok", tx=4)
-arrow(76, 44, 78, 37, color=GREEN_E)
+arrow(76, 43, 78, 37, color=GREEN_E)
 # loop back to GetImage after publish
-ax.add_patch(FancyArrowPatch((96, 32.5), (99, 32.5), color=GREEN_E, arrowstyle="-"))
-ax.add_patch(FancyArrowPatch((99, 32.5), (99, 66.5), color=GREEN_E, arrowstyle="-"))
+ax.add_patch(FancyArrowPatch((96, 31.5), (99, 31.5), color=GREEN_E, arrowstyle="-"))
+ax.add_patch(FancyArrowPatch((99, 31.5), (99, 66.5), color=GREEN_E, arrowstyle="-"))
 ax.add_patch(FancyArrowPatch((99, 66.5), (94, 66.5), color=GREEN_E, arrowstyle="-|>", mutation_scale=13))
 ax.text(99.5, 49, "next\nframe", ha="left", va="center", fontsize=8, color=GREEN_E)
 # get image -> fail branch (left/down to recover)
-arrow(58, 63, 52, 18, color=RED_E, text="timeout /\nfail", tx=-4, ty=6)
-# recover -> back to GetImage
+arrow(58, 63, 58, 19, color=RED_E, text="timeout /\nerror", tx=-5, ty=1)
+# expected wait or recoverable error below threshold -> back to GetImage
 ax.add_patch(FancyArrowPatch((58, 13), (50, 13), color=RED_E, arrowstyle="-"))
 ax.add_patch(FancyArrowPatch((50, 13), (50, 66.5), color=RED_E, arrowstyle="-"))
 ax.add_patch(FancyArrowPatch((50, 66.5), (58, 66.5), color=RED_E, arrowstyle="-|>", mutation_scale=13))
-ax.text(48.5, 40, "retry", ha="center", va="center", fontsize=8, color=RED_E, rotation=90)
-# give up
-box(58, -2, 40, 7, "fail_count > N  →  shutdown / reopen", "#fff4d6", "#b8860b", fs=8.5)
-arrow(78, 8, 78, 5, color="#b8860b")
+ax.text(48.5, 40, "wait / below threshold", ha="center", va="center",
+        fontsize=8, color=RED_E, rotation=90)
+# escalate after the configured error-duration or count threshold
+box(58, -4, 40, 8,
+    "threshold reached → Stop + Start\npersistent / fatal → reopen + reapply or report fault",
+    "#fff4d6", "#b8860b", fs=8.0)
+arrow(78, 7, 78, 4, color="#b8860b", text="escalate", tx=7)
 
-ax.set_title("From SDK to cv::Mat: the grab pipeline and its bounded auto-reconnect\n"
-             "green = happy path (one frame in, one cv::Mat out) | red = a dropped frame "
-             "self-heals via stop/start; only N-in-a-row escalates",
+ax.set_title("Example SDK-buffer-to-cv::Mat path with classified recovery\n"
+             "green = owned frame path | red = classify before counting or escalating",
              fontsize=11, loc="center")
 
 out = os.path.join(os.path.dirname(__file__), "..", "..",
