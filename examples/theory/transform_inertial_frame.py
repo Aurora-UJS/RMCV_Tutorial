@@ -2,11 +2,16 @@
 # A target that is perfectly static in the odom frame appears to move at
 # omega * r in the camera frame while the gimbal sweeps.
 # Output: chapters/2.Theory/images/theory-transform-inertial-frame.png
-import numpy as np
-import matplotlib.pyplot as plt
+from pathlib import Path
 
-# Scenario: gimbal yaw sweeps at omega = 2 rad/s; target static in odom.
-omega = 2.0                       # rad/s, ordinary tracking speed
+import matplotlib.pyplot as plt
+import numpy as np
+
+OUTPUT = (Path(__file__).resolve().parents[2]
+          / "chapters/2.Theory/images/theory-transform-inertial-frame.png")
+
+# Scenario chosen for the illustration: gimbal yaw sweeps at 2 rad/s.
+omega = 2.0                       # rad/s
 t = np.linspace(0.0, 0.5, 300)    # s
 yaw = -0.5 + omega * t            # rad, sweep -28.6 deg -> +28.6 deg
 p_odom = np.array([3.0, 0.8])     # m, static target (top view: x forward, y left)
@@ -66,7 +71,7 @@ axR.annotate("left (camera)", (t[-1], left[-1]), textcoords="offset points",
              xytext=(6, 0), fontsize=9, color=C_CAM, va="center")
 # slope annotation where the left-coordinate changes fastest (t = 0.25 s, yaw = 0)
 k = np.argmin(np.abs(yaw))
-axR.annotate(f"slope ≈ {omega * p_odom[0]:.1f} m/s\n(chassis top speed ≈ 3–4 m/s)",
+axR.annotate(f"local slope ≈ {omega * p_odom[0]:.1f} m/s\nfor this simulated sweep",
              (t[k], left[k]), textcoords="offset points", xytext=(14, -58),
              fontsize=9, color="#333333",
              arrowprops=dict(arrowstyle="->", color="#333333", lw=1))
@@ -78,9 +83,8 @@ axR.grid(alpha=0.25, lw=0.5)
 fig.suptitle("A static target 'moves' in the camera frame while the gimbal turns",
              fontsize=12)
 fig.tight_layout(rect=(0, 0, 1, 0.93))
-out = "chapters/2.Theory/images/theory-transform-inertial-frame.png"
-fig.savefig(out, dpi=150, bbox_inches="tight")
-print("saved", out)
+fig.savefig(OUTPUT, dpi=150, bbox_inches="tight")
+print("saved", OUTPUT)
 print(f"r = {r:.3f} m, apparent speed = {v_app:.2f} m/s")
 # sanity: numeric derivative of camera-frame position magnitude
 vx = np.gradient(fwd, t); vy = np.gradient(left, t)

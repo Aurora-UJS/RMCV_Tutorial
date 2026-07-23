@@ -3,9 +3,14 @@
 # extra roll rotate the body about the same physical axis: panels (b) and (c)
 # end up in exactly the same attitude.
 # Output: chapters/2.Theory/images/theory-transform-gimbal-lock.png
-import numpy as np
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+OUTPUT = (Path(__file__).resolve().parents[2]
+          / "chapters/2.Theory/images/theory-transform-gimbal-lock.png")
 
 def Rx(a):
     c, s = np.cos(a), np.sin(a)
@@ -95,7 +100,6 @@ for k, (R, title) in enumerate(zip([R_a, R_b, R_c], titles)):
 fig.suptitle("Gimbal lock: at pitch = ±90°, yaw and roll rotate about the same axis",
              fontsize=12)
 fig.tight_layout(rect=(0, 0, 1, 0.94))
-out = "chapters/2.Theory/images/theory-transform-gimbal-lock.png"
-fig.savefig(out, dpi=150, bbox_inches="tight")
-print("saved", out)
+fig.savefig(OUTPUT, dpi=150, bbox_inches="tight")
+print("saved", OUTPUT)
 print("max |R_b - R_c| =", np.abs(R_b - R_c).max())
