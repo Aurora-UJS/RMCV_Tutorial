@@ -1,9 +1,14 @@
-# Distortion field of a real calibration file (community open-source config:
-# 1440x1080, fx~1807, plumb_bob five-coefficient model).
+# Distortion field for the example calibration values quoted in the chapter
+# (1440x1080, fx~1807, plumb_bob five-coefficient model).
 # Left: displacement magnitude |distorted - ideal| in pixels over the frame.
 # Right: the same displacement along the line from the principal point to the
-# farthest image corner.
+# farthest valid image corner. This is a model displacement, not reprojection
+# error; raw points with K,D and consistently undistorted points are both valid
+# processing paths. Radial and tangential terms are included, so the complete
+# displacement is not a pure r^3 curve.
 # Generates chapters/3.Practice/images/practice-calibration-distortion.png
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -11,7 +16,7 @@ import matplotlib as mpl
 BLUE, MAGENTA, GRAY = "#3B6FD4", "#D6336C", "#8A8A8A"
 mpl.rcParams.update({"font.size": 11})
 
-# --- real calibration output (camera_info.yaml of a community RM vision stack) ---
+# --- example calibration output ---
 W, H = 1440, 1080
 fx, fy = 1807.12121, 1806.46896
 cx, cy = 711.11997, 562.49495
@@ -32,7 +37,7 @@ def brown_shift(u, v):
 
 
 # --- panel A: magnitude map over the frame ---
-uu, vv = np.meshgrid(np.linspace(0, W, 241), np.linspace(0, H, 181))
+uu, vv = np.meshgrid(np.linspace(0, W - 1, 241), np.linspace(0, H - 1, 181))
 du, dv = brown_shift(uu, vv)
 mag = np.hypot(du, dv)
 
@@ -46,16 +51,16 @@ axA.clabel(cs, fmt="%g px", fontsize=8)
 axA.plot(cx, cy, "+", color=MAGENTA, ms=11, mew=2)
 axA.annotate("principal point", (cx, cy), (cx + 60, cy - 60),
              color=MAGENTA, fontsize=9)
-axA.set_xlim(0, W)
-axA.set_ylim(H, 0)  # image convention: v downwards
+axA.set_xlim(0, W - 1)
+axA.set_ylim(H - 1, 0)  # image convention: v downwards
 axA.set_aspect("equal")
 axA.set_xlabel("u (px)")
 axA.set_ylabel("v (px)")
 axA.set_title("displacement over the 1440$\\times$1080 frame", fontsize=11)
 fig.colorbar(cf, ax=axA, shrink=0.85, label="|shift| (px)")
 
-# --- panel B: displacement along the worst radial direction ---
-corners = np.array([[0, 0], [W, 0], [0, H], [W, H]], float)
+# --- panel B: displacement toward the farthest valid corner ---
+corners = np.array([[0, 0], [W - 1, 0], [0, H - 1], [W - 1, H - 1]], float)
 rad = np.hypot(corners[:, 0] - cx, corners[:, 1] - cy)
 far = corners[np.argmax(rad)]
 R0 = rad.max()
@@ -70,9 +75,10 @@ axB.axvspan(0, 300, color=GRAY, alpha=0.18, lw=0)
 axB.annotate("central zone\n(r < 300 px)", (150, 5.0), ha="center",
              color="#555555", fontsize=9)
 axB.plot(R0, shift[-1], "o", color=MAGENTA, ms=7, zorder=5)
-axB.annotate(f"image corner: {shift[-1]:.1f} px", (R0 - 20, shift[-1]),
+axB.annotate(f"farthest valid corner: {shift[-1]:.1f} px", (R0 - 20, shift[-1]),
              ha="right", va="bottom", color=MAGENTA, fontsize=10)
-r1 = r[np.searchsorted(shift, 1.0)]
+cross = np.searchsorted(shift, 1.0)
+r1 = np.interp(1.0, shift[cross - 1:cross + 1], r[cross - 1:cross + 1])
 axB.axhline(1.0, color=GRAY, lw=0.8, ls="--")
 axB.annotate(f"1 px at r $\\approx$ {r1:.0f} px", (r1 + 30, 1.45),
              fontsize=9, color="#555555")
@@ -81,21 +87,22 @@ axB.set_ylabel("|shift| (px)")
 axB.set_xlim(0, R0 * 1.02)
 axB.set_ylim(0, 10.8)
 axB.grid(color="#E5E5E5", lw=0.6)
-axB.set_title("along the worst radial direction", fontsize=11)
+axB.set_title("toward the farthest valid corner", fontsize=11)
 
 fig.suptitle("plumb_bob $[-0.078,\\ 0.159,\\ 0.0003,\\ -0.0006,\\ 0]$: "
-             f"sub-pixel near the center, $\\approx$ {shift[-1]:.1f} px at the corners",
+             f"sub-pixel near the center, $\\approx$ {shift[-1]:.1f} px at the farthest valid corner",
              fontsize=13, y=1.02)
 fig.tight_layout()
-fig.savefig("/home/neomelt/RMCV_Tutorial/chapters/3.Practice/images/"
-            "practice-calibration-distortion.png",
+output = (Path(__file__).resolve().parents[2] / "chapters/3.Practice/images/"
+          "practice-calibration-distortion.png")
+fig.savefig(output,
             dpi=150, bbox_inches="tight", facecolor="white")
 
 # numbers used in the chapter text
 du, dv = brown_shift(cx + 300 * dirv[0], cy + 300 * dirv[1])
-print(f"corner shift      = {shift[-1]:.2f} px  (r = {R0:.0f} px)")
+print(f"farthest valid corner shift = {shift[-1]:.2f} px  (r = {R0:.1f} px)")
 print(f"shift at r=300 px = {np.hypot(du, dv):.2f} px")
-print(f"1 px crossing     = r {r1:.0f} px")
+print(f"1 px crossing     = r {r1:.1f} px")
 print(f"fx * 3.45um       = {fx * 3.45e-3:.3f} mm")
 print(f"fy/fx deviation   = {abs(fy / fx - 1) * 100:.3f} %")
 print(f"cx off center     = {cx - W / 2:+.1f} px, cy off center = {cy - H / 2:+.1f} px")

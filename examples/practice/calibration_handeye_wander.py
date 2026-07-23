@@ -1,11 +1,12 @@
-# Hand-eye acceptance test, simulated exactly (no small-angle approximation):
-# a static target 4 m away is re-projected into odom through an extrinsic with a
-# deliberate error while the gimbal sweeps a Lissajous pattern
-# (yaw +-20 deg, pitch +-10 deg).
-# Left: where the "static" target wanders in the transverse (y-z) plane.
-# Right: error magnitude vs distance -- rotation error grows linearly with
-# range, translation error stays constant.
+# Illustrative hand-eye consistency sensitivity for a fixed target 4 m away
+# while the gimbal sweeps yaw +-20 deg and pitch +-10 deg. The left panel uses
+# full rotation matrices for the specified axes and sweep. The right panel uses
+# the first-order perpendicular scale d*|delta theta|; an arbitrary direction
+# instead gives d_perp*|delta theta| <= d*|delta theta|. The curves illustrate
+# geometry and do not define a firing threshold or uniquely diagnose a cause.
 # Generates chapters/3.Practice/images/practice-calibration-handeye.png
+from pathlib import Path
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -28,30 +29,29 @@ def rot_axis(axis, angle):
     return np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * (K @ K)
 
 
-# true extrinsic: axis swap (optical z-forward -> body x-forward) + mount offset
+# Nominal extrinsic used to synthesize the example.
 R_GC = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]], float)
 t_GC = np.array([0.10, 0.0, 0.05])
 
-p_O = np.array([4.0, 0.0, 0.0])            # static target, 4 m ahead in odom
+p_O = np.array([4.0, 0.0, 0.0])  # fixed target, 4 m ahead in reference frame O
 
-# gimbal sweep: Lissajous, yaw +-20 deg / pitch +-10 deg (target stays in FOV)
+# Two-axis periodic sweep: yaw +-20 deg / pitch +-10 deg (target stays in FOV)
 t = np.linspace(0, 2 * np.pi, 600)
 yaw = np.deg2rad(20) * np.sin(t)
 pitch = np.deg2rad(10) * np.sin(2 * t + 0.6)
 
-# two rotation-error axes with very different signatures:
-# perpendicular to the line of sight -> constant offset of ~dtheta*d;
-# about the line of sight (roll)     -> first-order wander with the sweep
+# Two specified rotation-error axes with different pose-dependent signatures.
+# Their traces are examples for this target direction and sweep, not diagnoses.
 n_perp = np.array([0.0, 1.0, 1.0]) / np.sqrt(2)
 n_roll = np.array([1.0, 0.0, 0.0])
 
 cases = [
-    ("perfect extrinsic", None, None, "#222222", "-"),
+    ("no injected extrinsic error", None, None, "#222222", "-"),
     ("1 cm translation error", None, np.array([0.0, 0.01, 0.0]), BLUE, "-"),
-    # (drawn thicker below because its footprint is tiny -- that IS the point)
-    ("1$\\degree$ rotation $\\perp$ sight (offset)", (n_perp, 1.0), None,
+    # Translation is drawn thicker so its centimeter-scale path remains visible.
+    ("1$\\degree$ transverse-axis rotation", (n_perp, 1.0), None,
      MAGENTA, "-"),
-    ("1$\\degree$ rotation about sight (wander)", (n_roll, 1.0), None,
+    ("1$\\degree$ nominal sight-axis rotation", (n_roll, 1.0), None,
      MAGENTA, "-."),
 ]
 
@@ -83,43 +83,48 @@ for label, rot_err, dt, color, ls in cases:
         axL.plot(err[:, 1] * 100, err[:, 2] * 100, ls, color=color,
                  lw=lw, label=label)
 
-axL.set_xlabel("odom y error (cm)")
-axL.set_ylabel("odom z error (cm)")
+axL.set_xlabel("O-frame y error (cm)")
+axL.set_ylabel("O-frame z error (cm)")
 axL.set_aspect("equal")
 axL.grid(color="#E5E5E5", lw=0.6)
 axL.legend(loc="lower left", fontsize=8.5, framealpha=0.95)
-axL.set_title("static target in odom, yaw $\\pm$20$\\degree$ / "
+axL.set_title("fixed target in O, yaw $\\pm$20$\\degree$ / "
               "pitch $\\pm$10$\\degree$ sweep, d = 4 m", fontsize=11)
 
-# right: error magnitude vs target distance (first-order: dtheta * d vs |dt|)
+# Right: first-order perpendicular scale d*|delta theta| versus |delta t|.
 d = np.linspace(0.5, 8, 200)
 axR.plot(d, np.deg2rad(1.0) * d * 100, color=MAGENTA, lw=2.2,
-         label="1.0$\\degree$ rotation: $\\delta\\theta\\cdot d$")
+         label="1.0$\\degree$ perpendicular: $d|\\delta\\theta|$ (small angle)")
 axR.plot(d, np.deg2rad(0.5) * d * 100, "--", color=MAGENTA, lw=1.8,
-         label="0.5$\\degree$ rotation")
+         label="0.5$\\degree$ perpendicular scale")
 axR.axhline(1.0, color=BLUE, lw=2.2, label="1 cm translation: constant")
 axR.axhline(6.75, color=GRAY, lw=1.0, ls=":")
-axR.annotate("half armor width 6.75 cm", (0.7, 7.0), color="#555555", fontsize=9)
-x_miss = 6.75 / (np.deg2rad(1.0) * 100)
-axR.plot(x_miss, 6.75, "o", color=MAGENTA, ms=6)
-axR.annotate(f"full miss beyond {x_miss:.1f} m", (x_miss + 0.15, 5.6),
-             color=MAGENTA, fontsize=9)
+axR.annotate("13.5 cm plate: half-width = 6.75 cm", (0.7, 7.0),
+             color="#555555", fontsize=9)
+x_cross = 6.75 / (np.deg2rad(1.0) * 100)
+axR.plot(x_cross, 6.75, "o", color=MAGENTA, ms=6)
+axR.annotate(f"1$\\degree$ scale crosses\nreference at {x_cross:.1f} m",
+             xy=(x_cross, 6.75), xytext=(4.5, 5.1),
+             arrowprops={"arrowstyle": "->", "color": MAGENTA, "lw": 0.9},
+             color=MAGENTA, fontsize=9, ha="left")
 axR.set_xlabel("target distance d (m)")
-axR.set_ylabel("aim error (cm)")
+axR.set_ylabel("position-error scale (cm)")
 axR.set_xlim(0, 8)
 axR.set_ylim(0, 15)
 axR.grid(color="#E5E5E5", lw=0.6)
 axR.legend(loc="upper left", fontsize=8.5, framealpha=0.95)
-axR.set_title("error vs range: rotation scales, translation doesn't", fontsize=11)
+axR.set_title("perpendicular small-angle scale vs range", fontsize=11)
 
-fig.suptitle("Extrinsic acceptance: a static target must stay put — "
-             "1$\\degree$ of rotation error $\\approx$ 7 cm at 4 m",
+fig.suptitle("Illustrative hand-eye sensitivity: fixed target, specified sweep and error axes",
              fontsize=13, y=1.0)
 fig.tight_layout()
-fig.savefig("/home/neomelt/RMCV_Tutorial/chapters/3.Practice/images/"
-            "practice-calibration-handeye.png",
+output = (Path(__file__).resolve().parents[2] / "chapters/3.Practice/images/"
+          "practice-calibration-handeye.png")
+fig.savefig(output,
             dpi=150, bbox_inches="tight", facecolor="white")
 
+print("plate reference: full width = 13.50 cm, half-width = 6.75 cm")
+print(f"1 deg perpendicular scale crosses reference at {x_cross:.2f} m")
 for k, (mean_off, span) in stats.items():
     print(f"{k:28s} mean offset = {mean_off * 100:5.2f} cm, "
           f"max axis span = {span * 100:5.2f} cm")
