@@ -1,9 +1,10 @@
 """Why the tracker must unwrap the PnP yaw before feeding it to the EKF.
 
 PnP returns an armor orientation whose yaw lives in [-pi, pi]: it wraps.
-A spinning target crosses that seam once per full turn. If the raw wrapped yaw
-is handed straight to the filter, the innovation z - h(x) sees a fake jump of
-~2*pi at each seam, and one such wrong correction is enough to diverge.
+A spinning target crosses that seam once per full turn. Treating wrapped yaw as
+an ordinary real-valued signal creates a numeric jump of about 2*pi at each
+seam. Its effect on a filter depends on the innovation definition, gain, and
+gating; this script only demonstrates the angle-boundary mechanism.
 orientationToYaw() fixes this by accumulating shortest_angular_distance, which
 reconstructs a continuous (-inf, +inf) yaw.
 
@@ -13,7 +14,7 @@ Output: chapters/4.Application/images/app-tracking-yaw-unwrap.png
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import FuncFormatter, MultipleLocator
 
 PI = np.pi
 
@@ -46,11 +47,11 @@ for i in range(1, n):
     last = last + shortest_angular_distance(last, yaw_wrapped[i])
     yaw_unwrapped[i] = last
 
-# --- residuals the filter would see, frame to frame --------------------------
-naive_res = np.diff(yaw_wrapped)                # feeding wrapped yaw raw
-correct_res = np.diff(yaw_unwrapped)            # after unwrapping
-# seam frames: where the naive residual blows past half a turn
-seams = np.where(np.abs(naive_res) > PI)[0] + 1
+# --- frame-to-frame angle increments, not a complete EKF innovation ----------
+naive_step = np.diff(yaw_wrapped)
+correct_step = np.diff(yaw_unwrapped)
+# Seam frames: where the raw numeric step exceeds half a turn.
+seams = np.where(np.abs(naive_step) > PI)[0] + 1
 
 C_WRAP = "#c0392b"      # raw wrapped yaw  (the trap)
 C_CONT = "#1f6fb2"      # unwrapped yaw    (the fix)
@@ -79,29 +80,30 @@ axA.set_title(
 axA.legend(loc="upper left", fontsize=8.6, framealpha=0.95)
 axA.grid(True, alpha=0.25)
 axA.yaxis.set_major_locator(MultipleLocator(PI))
-axA.set_yticklabels([f"{v/PI:.0f}$\\pi$" if v != 0 else "0"
-                     for v in axA.get_yticks()])
+axA.yaxis.set_major_formatter(
+    FuncFormatter(lambda value, _: "0" if abs(value) < 1e-9 else f"{value / PI:.0f}$\\pi$")
+)
 
-# Panel B: the residual each path hands the filter
-axB.plot(frame[1:], naive_res, color=C_NAIVE, lw=1.5, marker="o", ms=2.6,
-         label="feed raw wrapped yaw:  diff jumps by ~$-2\\pi$ at each seam")
-axB.plot(frame[1:], correct_res, color=C_OK, lw=3.0, alpha=0.85,
-         label="feed unwrapped yaw:  residual stays $\\approx \\omega/\\mathrm{fps}$")
+# Panel B: adjacent-sample differences for the two representations.
+axB.plot(frame[1:], naive_step, color=C_NAIVE, lw=1.5, marker="o", ms=2.6,
+         label="raw wrapped yaw: adjacent step jumps by ~$-2\\pi$ at each seam")
+axB.plot(frame[1:], correct_step, color=C_OK, lw=3.0, alpha=0.85,
+         label="unwrapped yaw: adjacent step stays $\\approx \\omega/\\mathrm{fps}$")
 axB.axhline(0, color="0.6", lw=0.8)
 for s in seams:
     axB.axvline(s - 0.5, color="0.55", ls=":", lw=1.1, zorder=0)
-    axB.annotate("fake $-2\\pi$ residual\n(one bad correction diverges the EKF)",
-                 xy=(s, naive_res[s - 1]), xytext=(s + 5, -3.4),
-                 fontsize=8.6, color=C_NAIVE,
-                 arrowprops=dict(arrowstyle="->", color=C_NAIVE, lw=1.1))
+axB.annotate("numeric $-2\\pi$ boundary jump\n(filter impact depends on its update rule)",
+             xy=(seams[0], naive_step[seams[0] - 1]), xytext=(seams[0] + 8, -4.2),
+             fontsize=8.6, color=C_NAIVE,
+             arrowprops=dict(arrowstyle="->", color=C_NAIVE, lw=1.1))
 axB.set_xlabel("frame  (100 fps)")
-axB.set_ylabel("per-frame\nyaw residual  [rad]")
-axB.legend(loc="center right", fontsize=8.6, framealpha=0.95)
+axB.set_ylabel("adjacent-sample\nyaw step  [rad]")
+axB.legend(loc="upper left", fontsize=8.6, framealpha=0.95)
 axB.grid(True, alpha=0.25)
 
 fig.suptitle(
-    "Unwrap the yaw before the filter: raw PnP yaw fakes a $2\\pi$ ($360^\\circ$) jump; "
-    "accumulation restores the true small step",
+    "Yaw unwrapping removes the numeric $2\\pi$ ($360^\\circ$) boundary jump "
+    "when adjacent true rotation is below $\\pi$",
     fontsize=11, y=0.985, color="0.15")
 
 out = os.path.join(os.path.dirname(__file__), "..", "..",
@@ -109,5 +111,5 @@ out = os.path.join(os.path.dirname(__file__), "..", "..",
 out = os.path.abspath(out)
 fig.savefig(out, dpi=150, bbox_inches="tight")
 print("saved", out)
-print("seam frames:", seams, " naive residual at seams:",
-      np.round(naive_res[seams - 1], 3))
+print("seam frames:", seams, " raw adjacent steps at seams:",
+      np.round(naive_step[seams - 1], 3))

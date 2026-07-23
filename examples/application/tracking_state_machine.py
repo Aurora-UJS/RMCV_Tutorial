@@ -1,17 +1,20 @@
-"""The tracker's four-state lifecycle and its two hysteresis counters.
+"""The tracker's four-state lifecycle and its confirmation/deletion counters.
 
 Mirrors rm_auto_aim tracker.cpp::update() state machine:
   LOST -> DETECTING            first detection (init on armor closest to center)
   DETECTING -> TRACKING        matched for > tracking_thres consecutive frames
   DETECTING -> LOST            one miss (a flicker is not a target)
-  TRACKING  -> TEMP_LOST       one miss (but keep predicting, keep firing solution)
+  TRACKING  -> TEMP_LOST       one miss (keep predicting without a measurement)
   TEMP_LOST -> TRACKING        matched again
-  TEMP_LOST -> LOST            missed for > lost_thres frames (~lost_time_thres seconds)
+  TEMP_LOST -> LOST            missed for > lost_thres frames
 
-The point of the picture: DETECTING is a low-pass on birth (reject flicker),
-TEMP_LOST is a low-pass on death (ride through occlusion). During TEMP_LOST the
-EKF keeps running predict() and the node still publishes tracking=true, so the
-gimbal keeps following through a brief occlusion.
+The diagram shows the intended transitions with both counters initialized to
+zero. The inspected upstream constructor does not explicitly initialize them.
+
+DETECTING delays confirmation of a new target. TEMP_LOST delays deletion of an
+already confirmed track. During TEMP_LOST the EKF keeps running predict() and
+the reference node still publishes tracking=true; downstream behavior depends
+on the controller that consumes this flag.
 
 Output: chapters/4.Application/images/app-tracking-state-machine.png
 """
@@ -69,15 +72,15 @@ for n in NODES:
 # transitions
 edge("LOST", "DETECTING", "first detection\n(init: armor nearest image center)",
      rad=0.12, lx=-0.2, ly=0.55, color="#f08c00")
-edge("DETECTING", "TRACKING", "matched > tracking_thres frames\n(default 5)",
+edge("DETECTING", "TRACKING", "match count > tracking_thres\n(default 5)",
      rad=0.0, ly=0.5, color="#2f9e44")
-edge("DETECTING", "LOST", "one miss\n(reject flicker)",
-     rad=0.28, lx=0.1, ly=-0.75, color="#868e96")
+edge("DETECTING", "LOST", "one miss\n(cancel unconfirmed track)",
+     rad=0.28, lx=0.9, ly=-0.55, color="#868e96")
 edge("TRACKING", "TEMP_LOST", "one miss\n(EKF keeps predicting)",
      rad=0.0, lx=1.35, ly=0.0, color="#e8590c", ha="left")
 edge("TEMP_LOST", "TRACKING", "matched again\n(regain)",
      rad=0.28, lx=-1.5, ly=0.0, color="#2f9e44", ha="right")
-edge("TEMP_LOST", "LOST", "missed > lost_thres frames\n(= lost_time_thres / dt  ~ 0.3 s)",
+edge("TEMP_LOST", "LOST", "missed > lost_thres frames\n(= configured lost_time_thres / dt)",
      rad=-0.16, lx=-0.1, ly=-0.7, color="#868e96")
 
 # self loops (semantics note)
@@ -86,16 +89,15 @@ ax.annotate("matched:\nstay & correct", xy=(7.4, 1.7 + H / 2),
             arrowprops=dict(arrowstyle="-|>", color="#2f9e44",
                             connectionstyle="arc3,rad=-0.5", shrinkB=2))
 
-# banner: what "tracking=true" means downstream
+# Banner: which states set the track-valid flag in the reference node.
 ax.text(3.7, -2.75,
-        "publishes  tracking = true  (gimbal follows):  TRACKING  +  TEMP_LOST"
+        "publishes  tracking = true:  TRACKING  +  TEMP_LOST"
         "        |        tracking = false:  LOST  +  DETECTING",
         ha="center", va="center", fontsize=9.3, color="#212529",
         bbox=dict(boxstyle="round,pad=0.5", fc="#f1f3f5", ec="#ced4da"))
 
 ax.set_title(
-    "Tracker lifecycle: DETECTING is a low-pass on birth (reject flicker), "
-    "TEMP_LOST rides through occlusion",
+    "Tracker lifecycle: delayed confirmation and delayed deletion",
     fontsize=12.5, pad=12, color="#212529")
 
 out = os.path.join(os.path.dirname(__file__), "..", "..",

@@ -1,18 +1,20 @@
 # 图：二值化阈值的敏感性——阈值扫描下灯条候选与装甲板配对的数量
 # 复用基础篇/理论篇同一段流水线（examples/theory/dl_mlp_dissect.py 的提取逻辑），
 # 对 examples/test.mp4 的同一帧（7.0 s，与 mlp 拆解图同源）扫描 binary_thres：
-#   - 统计通过几何判据的“灯条候选”数与通过配对判据的“装甲板对”数；
-#   - 展示“阈值太低=杂斑泛滥、太高=灯条断裂消失”的机制，并标出
+#   - 统计通过几何判据的“灯条候选”数与通过简化配对判据的“装甲板对”数；
+#   - 为隔离阈值影响，不执行颜色投票、第三灯条否决和数字分类；
+#   - 展示低阈值会保留更多背景、高阈值会丢失灯条候选，并标出
 #     代码默认 160 与实战 yaml 80 两个取值。
 # 产出：chapters/4.Application/images/app-armor-binary-sweep.png
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
-REPO = "/home/neomelt/RMCV_Tutorial"
+REPO = Path(__file__).resolve().parents[2]
 
 
-def find_lights(gray, frame, thres):
+def find_lights(gray, thres):
     """按基础篇 C++ 判据在给定阈值下找灯条候选，返回灯条列表。"""
     _, binary = cv2.threshold(gray, thres, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -55,7 +57,7 @@ def count_armors(lights):
     return n
 
 
-cap = cv2.VideoCapture(f"{REPO}/examples/test.mp4")
+cap = cv2.VideoCapture(str(REPO / "examples" / "test.mp4"))
 cap.set(cv2.CAP_PROP_POS_MSEC, 7000)
 ok, frame = cap.read()
 assert ok, "无法读取测试帧"
@@ -64,7 +66,7 @@ gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 thresholds = np.arange(30, 251, 5)
 n_contours, n_lights, n_armors = [], [], []
 for t in thresholds:
-    nc, lights = find_lights(gray, frame, int(t))
+    nc, lights = find_lights(gray, int(t))
     n_contours.append(nc)
     n_lights.append(len(lights))
     n_armors.append(count_armors(lights))
@@ -86,18 +88,18 @@ for x, txt, col in [(80, "field yaml = 80", "#c02020"), (160, "code default = 16
 ax.set_xlabel("binary_thres (gray level)")
 ax.set_ylabel("count on one frame")
 ax.set_title("Binarization threshold sweep on one ordinary-exposure frame\n"
-             "too low -> background floods in;  too high -> lights break up and vanish",
+             "lower thresholds retain more background; higher thresholds can remove light candidates",
              fontsize=11)
 ax.set_xlim(30, 250)
 ax.set_ylim(bottom=0)
 ax.grid(alpha=0.25)
 ax.legend(loc="upper right", fontsize=8.5, framealpha=0.9)
 fig.tight_layout()
-out = f"{REPO}/chapters/4.Application/images/app-armor-binary-sweep.png"
+out = REPO / "chapters" / "4.Application" / "images" / "app-armor-binary-sweep.png"
 fig.savefig(out, dpi=150)
 print("saved", out)
 
 # 打印关键点的真实数字，供正文引用
 for t in [60, 80, 120, 160, 200, 220]:
-    nc, lights = find_lights(gray, frame, t)
+    nc, lights = find_lights(gray, t)
     print(f"thres={t:3d}  contours={nc:4d}  lights={len(lights):3d}  armors={count_armors(lights)}")
