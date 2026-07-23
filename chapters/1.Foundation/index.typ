@@ -1,6 +1,6 @@
 #import "/template/template.typ": *
 
-本书主要针对基础篇的内容。
+基础篇面向刚接触 RoboMaster 视觉开发的读者，依次介绍 Linux 环境、计算机系统、C++、CMake、软件工程、Git 和 ROS 2。各章既讲基本概念，也说明这些工具在机器人开发中的实际用途。
 
 == 初识 Linux
 #include "introduction_to_linux.typ"
@@ -57,5 +57,4 @@
 // - ROS 工具（rqt、rviz）
 // - 实战：简单的视觉/决策节点
 #include "ros_guide.typ"
-
 

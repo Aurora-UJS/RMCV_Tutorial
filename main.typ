@@ -5,11 +5,11 @@
   author: "Misaka21",
   date: datetime(year: 2025, month: 06, day: 25),
   abstract: [
-    Turn drawings of imagination into racetrack realization.
+    面向 RoboMaster 视觉组新队员的基础与工程实践教程。
   ],
   preface: [
     #align(center + horizon)[
-      Thank you for using this book #emoji.heart,\ I hope you like it #emoji.face.smile
+      希望这本书能帮你少走一些弯路，把想法一步步带到赛场上。
     ]
   ],
   table-of-contents: outline(depth: 3),
