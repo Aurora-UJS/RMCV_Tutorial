@@ -2,5 +2,5 @@
 #include "rm_vision.typ"
 == rm.cv.fans
 #include "rm_cv_fans.typ"
-== 同济自喵
+== sp_vision
 #include "sp_vision.typ"
