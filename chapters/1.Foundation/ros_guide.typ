@@ -413,7 +413,7 @@ parameters=[detector_config]
 
 ==== 命名空间与重映射
 
-多车协同或多相机场景中，命名空间非常重要。比如同一算法复用两路相机：
+同一套算法复用两路相机时，两份节点需要各自的话题前缀，否则发布者和订阅者很容易接错数据。命名空间可以把它们整理成：
 
 - `/front/detector/target`
 - `/rear/detector/target`
