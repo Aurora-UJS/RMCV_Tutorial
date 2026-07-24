@@ -5,21 +5,21 @@
 阅读陌生工程也需要顺序。先看仓库、软件包和构建配置，确定边界；再沿消息或函数调用找到主数据流；随后选择模型定义、状态更新和协议接口等关键位置精读；最后用当前源码、配置和测试反查 README 中的描述。这三章会对三个项目各走一遍这套流程。README 仍然适合了解设计意图和寻找入口，但涉及版本、参数、状态下标或接口签名时，需要回到对应版本的一手文件核对。
 
 
-#note("阅读源码与复制源码是两件事")[
-跟着本篇读设计和实现没有问题；准备把源码带进自己的项目时，再停下来逐仓库看许可证。rm_vision 各子仓并不统一，表格会顺手标出；sp_vision 的根仓是 MIT；rm.cv.fans 没有许可证文件，所以对应章节只讲公开文档和代码结构，不摘录源码。相机仓库附带的厂商 SDK 还要另查厂商条款。记住这条边界即可，不必让许可证打断后面的代码主线。
-]
+读源码和复制源码是两件事。跟着本篇学设计和实现时，先沿主线往下读；真正准备把代码带进自己的项目时，再按目标仓库、文件和厂商 SDK 核对许可条款。后面只在需要处顺手标出这条边界，不让它打断代码主线。
 
 === 项目定位与版本范围
 
-rm_vision 发布在 chenjunnn（Chen Jun）的个人账户下，README 将它定位为面向 RM 队伍的“规范、易用、鲁棒、高性能的视觉框架方案”。同一份 README 的“包含项目”还链接了自动瞄准、两套相机驱动、云台描述、串口驱动和仿真器。本章把伞仓连同这六个链接都纳入范围，不根据宣传性形容词推断项目能力，而是检查各仓库实际提供了什么、哪些进入默认部署，以及它们怎样连接。
+rm_vision 发布在 chenjunnn（Chen Jun）的个人账户下，README 将它定位为面向 RM 队伍的“规范、易用、鲁棒、高性能的视觉框架方案”。同一份 README 的“包含项目”还链接了自动瞄准、两套相机驱动、云台描述、串口驱动和仿真器。本章把 `rm_vision` 这个聚合仓库（umbrella repository，主要负责汇总入口并链接多个独立仓库）连同这六个链接都纳入范围，不根据宣传性形容词推断项目能力，而是检查各仓库实际提供了什么、哪些进入默认部署，以及它们怎样连接。
 
-先固定本章依据的版本。截至 2026 年 7 月核对时，七个仓库的 `main` 分支分别是：`rm_vision` 的 `2ead8d0`（2024 年 11 月 8 日），`rm_auto_aim` 的 `f244d0e`（2023 年 5 月 19 日），MindVision 与 HikVision 驱动的 `7c0aab2`、`ebe1f1a`（均为 2023 年 5 月 17 日），`rm_gimbal_description` 与 `rm_serial_driver` 的 `0ccd8ce`、`794f4ec`（均为 2023 年 5 月 20 日），以及仿真器的 `e937f21`（2023 年 3 月 18 日）。这些短哈希不用背，它们只是保证后面的行号和结论都指向同一份代码。除伞仓在 2024 年删除过 README 推广信息外，其余版本都停在 2023 年；长期未变化只说明阅读路径中的文件位置相对固定，不等于它们已经在近年的规则、硬件和依赖上得到验证。
+把它作为第一个阅读样本，理由很实际：模型集中定义，QoS、TF 和串口路径都能一路追到具体文件，正好适合练习从仓库入口走到运行链与关键算法。下面先固定版本和边界，后面再沿着这条路线往里读。
+
+先固定本章依据的版本。截至 2026 年 7 月核对时，七个仓库的 `main` 分支分别是：`rm_vision` 的 `2ead8d0`（2024 年 11 月 8 日），`rm_auto_aim` 的 `f244d0e`（2023 年 5 月 19 日），MindVision 与 HikVision 驱动的 `7c0aab2`、`ebe1f1a`（均为 2023 年 5 月 17 日），`rm_gimbal_description` 与 `rm_serial_driver` 的 `0ccd8ce`、`794f4ec`（均为 2023 年 5 月 20 日），以及仿真器的 `e937f21`（2023 年 3 月 18 日）。这些短哈希不用背，它们只是保证后面的行号和结论都指向同一份代码。在本章固定的七个版本中，只有聚合仓库延续到 2024 年（当年删除了 README 中的推广信息）；其余六个仓库都停在 2023 年。长期未变化只说明阅读路径中的文件位置相对固定，不等于它们已经在近年的规则、硬件和依赖上得到验证。
 
 `rm_auto_aim` 的 C++ 源文件和头文件合计 1948 行（不含测试）：识别部分 1067 行，跟踪部分 881 行。这个统计只描述所核对提交中的物理行数，不代表功能复杂度或代码质量；它说明的是主干规模可控，适合完整阅读，而不是只截取几个函数。
 
 === 仓库与软件包边界
 
-读陌生工程时，先区分仓库、ROS 软件包和可执行节点。rm_vision 采用*伞仓*（umbrella repository）结构：`rm_vision` 自身主要包含 `rm_vision_bringup` 包及其 launch、参数文件，算法、硬件接口和仿真环境位于 README 链接的独立仓库。七个仓库的边界如下：
+读陌生工程时，先区分仓库、ROS 软件包和可执行节点。`rm_vision` 自身主要包含 `rm_vision_bringup` 包及其 launch、参数文件，算法、硬件接口和仿真环境位于 README 链接的独立仓库。七个仓库的边界如下：
 
 #[
 #show table: set text(size: 9pt)
@@ -41,13 +41,13 @@ rm_vision 发布在 chenjunnn（Chen Jun）的个人账户下，README 将它定
     [`rm_serial_driver`], [1], [Apache-2.0], [串口收发、动态 TF、参数回写与复位请求],
     [`rm_vision_simulator`], [0], [Apache-2.0], [独立 Unity 工程，发布合成图像、相机信息与关节状态],
   ),
-  caption: [rm_vision README 所列项目的仓库-包映射。前六个 ROS 仓库合计包含 9 个 ament 包；仿真器是 Unity 项目，不是 ament 包。仓库名也不一定等于包名，例如 `rm_auto_aim` 一个仓库含四个包。许可证列描述固定版本中能直接核对的材料；相机 SDK 的授权范围仍需另查厂商条款。],
+  caption: [rm_vision README 所列项目的仓库-包映射。前六个 ROS 仓库合计包含 9 个 ament 包；仿真器是 Unity 项目，不是 ament 包。仓库名也不一定等于包名，例如 `rm_auto_aim` 一个仓库含四个包。],
 )
 ]
 
-表里的许可证只用来提醒复用边界，不影响我们继续读代码。真正准备发布时再细查：九个 `package.xml` 中有五个字段还是 `TODO`，另外几处与根仓 LICENSE 不一致；两个相机仓库附带的厂商 SDK 也不能直接套用 ROS 封装层的许可证。对新人更实用的教训是，自动生成的包元数据不一定已经填对，发布前要把 `package.xml`、根许可证和第三方清单对一遍。
+表里的许可证只作边界标记，先继续看运行结构。这里顺手记住一处元数据欠账：九个 `package.xml` 中有五个许可证字段仍是 `TODO`，另有几处与根仓 LICENSE 不一致；真正发布或复制代码前，再核对这些元数据是否与实际授权相符。
 
-README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项目作者提供了哪些入口；Dockerfile 说明默认镜像实际取回哪些仓库；launch 才说明一次启动会装配哪些节点。固定 Dockerfile 克隆了伞仓、自动瞄准、两套相机驱动、云台描述和串口驱动，却没有克隆 Unity 仿真器。`vision_bringup.launch.py` 同时写出了 HikVision 和 MindVision 组件，但按 `launch_params.yaml` 的 `camera` 值二选一，默认值是 `hik`；选中的相机与识别器进入同一个组件容器。`no_hardware.launch.py` 只启动 `robot_state_publisher`、识别器和跟踪器，本身也不启动仿真器或其他图像源。因此，“README 提供了链接”不能直接改写成“默认部署已经接入”。
+README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项目作者提供了哪些入口；Dockerfile 说明默认镜像实际取回哪些仓库；launch 才说明一次启动会装配哪些节点。所核对版本的 Dockerfile 克隆了聚合仓库、自动瞄准、两套相机驱动、云台描述和串口驱动，却没有克隆 Unity 仿真器。`vision_bringup.launch.py` 同时写出了 HikVision 和 MindVision 组件，但按 `launch_params.yaml` 的 `camera` 值二选一，默认值是 `hik`；选中的相机与识别器进入同一个组件容器。`no_hardware.launch.py` 只启动 `robot_state_publisher`、识别器和跟踪器，本身也不启动仿真器或其他图像源。因此，“README 提供了链接”不能直接改写成“默认部署已经接入”。
 
 全景边界确定后，源码精读仍应有所取舍。相机驱动和仿真器先读到足以判断数据、时间戳、部署和故障边界；识别、跟踪与串口则沿主控制流深入。可以先认数据结构和识别流程，再进入滤波模型，最后查看与下位机的协议边界：
 
@@ -83,7 +83,7 @@ README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项
 
 主要前向数据链包含四个传递阶段：被选中的 HikVision 或 MindVision 相机节点 $arrow.r$ `/image_raw` $arrow.r$ 识别节点 $arrow.r$ `/detector/armors` $arrow.r$ 跟踪节点 $arrow.r$ `/tracker/target` $arrow.r$ 串口节点 $arrow.r$ 下位机。调试信息、marker 和 TF 等辅助话题不属于这条目标数据链，但仍会影响观测与排障。
 
-识别节点对图像的订阅，以及识别结果和跟踪目标的相应端点使用 `SensorDataQoS`（例如 `detector_node.cpp:39,90`、`tracker_node.cpp:152`）：best-effort、keep-last，默认深度为 5。相机发布端却不能一概而论：在伞仓组件路径中，HikVision 驱动的源码默认使用 sensor-data profile，MindVision 驱动默认使用 reliable 的普通 profile，因为伞仓没有覆盖各自的 `use_sensor_data_qos`。后者仍可向请求 best-effort 的订阅端提供数据，但丢包与重传行为不再相同。`/tracker/info` 与 marker 等调试发布器按深度 10 创建，也采用默认 reliable 配置。这里展示的是逐端点核对 QoS，而不是从一个订阅者反推整条链路。
+识别节点对图像的订阅，以及识别结果和跟踪目标的相应端点使用 `SensorDataQoS`（例如 `detector_node.cpp:39,90`、`tracker_node.cpp:152`）：best-effort、keep-last，默认深度为 5。相机发布端却不能一概而论：在聚合仓库的组件路径中，HikVision 驱动的源码默认使用 sensor-data profile，MindVision 驱动默认使用 reliable 的普通 profile，因为聚合仓库没有覆盖各自的 `use_sensor_data_qos`。后者仍可向请求 best-effort 的订阅端提供数据，但丢包与重传行为不再相同。`/tracker/info` 与 marker 等调试发布器按深度 10 创建，也采用默认 reliable 配置。这里展示的是逐端点核对 QoS，而不是从一个订阅者反推整条链路。
 
 绿色连接在 `vision_bringup.launch.py:24-45` 中装配：选中的相机组件与识别组件都设置 `use_intra_process_comms: True`。单独用 `ros2 run` 启动时，它们不再共享这个组件容器，通信路径也会变化。两套相机还共用 `/camera_node` 参数段，其中 `exposure_time` 对两者都有效，但现有 `gain: 8.0` 只匹配 HikVision 的 `gain`；MindVision 声明的是整数参数 `analog_gain`，不会自动把前者翻译过去。能在 launch 中替换组件，不代表参数模式和运行行为也已经统一。
 
@@ -105,19 +105,19 @@ README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项
 
 接口对上了还不够，这里有个值得停下来看的缓冲区问题：两个驱动都只对 `image_msg_.data` 调用 `reserve()`，没有先 `resize()`。MindVision 随后让 SDK 写入尚不属于 vector 元素范围的 `data()`；HikVision 还把当时为 0 的 `size()` 当作输出缓冲区长度。两边都不检查转换结果，之后才 `resize()` 并发布。这个调用顺序违反了 C++ 容器的使用约定，应先修正再上机验证；至于现有 SDK 会把它表现成黑帧、旧帧还是其他故障，不能只靠读代码猜。
 
-标定信息也不是“有 YAML 就完成了”。HikVision 自带配置写 640×480，伞仓覆盖配置写 1440×1080；驱动读取相机当前宽高，却不设置分辨率，也不检查 Image 与 CameraInfo 的尺寸是否一致。两份配置可以分别对应不同相机模式，但部署时必须以实际模式重新核对。MindVision 同样没有用实际帧尺寸验证所加载的内参。颜色通道、分辨率与内参至少应使用已知色块和标定板做端到端检查。
+标定信息也不是“有 YAML 就完成了”。HikVision 自带配置写 640×480，聚合仓库的覆盖配置写 1440×1080；驱动读取相机当前宽高，却不设置分辨率，也不检查 Image 与 CameraInfo 的尺寸是否一致。两份配置可以分别对应不同相机模式，但部署时必须以实际模式重新核对。MindVision 同样没有用实际帧尺寸验证所加载的内参。颜色通道、分辨率与内参至少应使用已知色块和标定板做端到端检查。
 
 现有自动化也覆盖不到这些问题：HikVision 仓库没有功能或硬件测试，MindVision workflow 只构建并明确设置 `skip-tests: true`；后者的安装规则还没有把仓库内的 `libMVSDK.so` 装进 install tree。两仓虽然都带了 x86-64 与 AArch64 版本的 SDK，也不能据此认定 ARM 实机已经跑通。接手这部分时，最小检查不是再读一遍 README，而是在干净安装目录启动节点，再用真实相机核对色块、分辨率、内参、时间戳和拔插后的行为。
 
 === 仿真器：提供合成输入，但不在默认运行链
 
-最后把仿真器放回正确的位置。`rm_vision_simulator` 是 Unity 2021.3.11f1c1 工程，不是 ROS 2 ament 包。固定版本只有六个项目 C\# 脚本：它通过 Ros2ForUnity 发布 `/image_raw`、`/camera_info` 和 `/joint_states`；底盘由键盘直接改变刚体速度，云台由鼠标直接旋转 Transform，能量机关按固定转速和定时序列改变灯光。换句话说，它首先是一个合成图像源和可动场景，不是完整的车辆与下位机模拟器；代码没有订阅跟踪目标或云台命令，也没有串口、CAN、电机闭环和延迟模型。
+进入算法前，再把仿真器放回运行链中看一眼。`rm_vision_simulator` 是 Unity 2021.3.11f1c1 工程，不是 ROS 2 ament 包。固定版本只有六个项目 C\# 脚本：它通过 Ros2ForUnity 发布 `/image_raw`、`/camera_info` 和 `/joint_states`；底盘由键盘直接改变刚体速度，云台由鼠标直接旋转 Transform，能量机关按固定转速和定时序列改变灯光。换句话说，它首先是一个合成图像源和可动场景，不是完整的车辆与下位机模拟器；代码没有订阅跟踪目标或云台命令，也没有串口、CAN、电机闭环和延迟模型。
 
 它发布的 CameraInfo 也不能直接当作定量 PnP 的可靠内参。脚本用竖直视场角和图像宽度计算 `fx`，公式还额外乘了一次视场角，并简单令 `fy=fx`；消息没有填写 `width`、`height`、`R` 和 `P`。识别节点收到第一条 CameraInfo 后就固定使用其中的 `K`、`D` 创建 PnP 求解器，因此在把内参与 Unity 投影矩阵逐项对齐之前，仿真中的位姿尺度和轨迹只能用于流程调试，不能当作几何精度结果。
 
 这里最容易产生的误解，是看到能量机关的 `BeenHit()` 就以为仿真器做了射击闭环。实际上，它只是定时协程调用的材质变色函数，不是命中检测；工程里也没有弹丸、弹道积分或解算、装甲板选择、开火判据与碰撞伤害。`RobotSpin.cs` 虽然定义了固定旋转，却没有被当前场景或 Prefab 引用。因此，可以用它观察算法面对合成图像和人工运动时的输出，却不能拿它验证弹道、云台闭环或命中率。
 
-仿真器 README 要求用户另行安装 Windows ROS 2 Humble 与 Ros2ForUnity 1.2.0，插件目录又没有进入仓库。伞仓 Dockerfile 不克隆它，两份 launch 也不启动 Unity；`no_hardware.launch.py` 虽会启动 `robot_state_publisher`、识别器和跟踪器，却没有串口节点提供 `odom` 到云台的动态 TF。Unity 发布的 `yaw_joint`、`pitch_joint` 也对不上 URDF 中唯一的 floating `gimbal_joint`。所以，手工接上图像话题还不足以跑通跟踪：还要补齐 `odom` 到相机的 TF，或实现关节名与坐标系适配，否则跟踪器的 TF 消息过滤器不会放行识别结果。固定仓库没有给出这套一键编排，本章也没有在目标 Windows/Unity 环境中验证构建与联通。即使联通，结果仍只覆盖固定场景、材质和渲染相机，不能外推到真实相机噪声、曝光、畸变、USB 抖动或实车机构。
+仿真器 README 要求用户另行安装 Windows ROS 2 Humble 与 Ros2ForUnity 1.2.0，插件目录又没有进入仓库。聚合仓库的 Dockerfile 不克隆它，两份 launch 也不启动 Unity；`no_hardware.launch.py` 虽会启动 `robot_state_publisher`、识别器和跟踪器，却没有串口节点提供 `odom` 到云台的动态 TF。Unity 发布的 `yaw_joint`、`pitch_joint` 也对不上 URDF 中唯一的 floating `gimbal_joint`。所以，手工接上图像话题还不足以跑通跟踪：还要补齐 `odom` 到相机的 TF，或实现关节名与坐标系适配，否则跟踪器的 TF 消息过滤器不会放行识别结果。固定仓库没有给出这套一键编排，本章也没有在目标 Windows/Unity 环境中验证构建与联通。即使联通，结果仍只覆盖固定场景、材质和渲染相机，不能外推到真实相机噪声、曝光、畸变、USB 抖动或实车机构。
 
 === 识别链：基础篇那套四级级联，在这里长什么样
 
@@ -397,7 +397,7 @@ README 与代码位于不同文件，编译器不会自动检查两者一致。�
 
 如果准备把 rm_vision 当作新项目起点，先别急着换检测器或调滤波参数。下面四项会更早决定它能不能稳定跑起来：
 
-- *先锁定版本，再补构建说明*。除伞仓后来只改过 README 外，自动瞄准、两套相机、云台描述、串口和仿真器的固定 HEAD 都停在 2023 年 3 月至 5 月；主 README 的 Docker 部署与源码编译两节又以 `TBD` 结束。相关说明主要面向 Ubuntu 22.04、ROS 2 Humble，仿真器则要求 Windows ROS 2 Humble 与指定 Unity 版本。接手后应先固定一组已知提交，再在目标系统上重跑构建和硬件检查。
+- *先锁定版本，再补构建说明*。除聚合仓库后来只改过 README 外，自动瞄准、两套相机、云台描述、串口和仿真器的固定 HEAD 都停在 2023 年 3 月至 5 月；主 README 的 Docker 部署与源码编译两节又以 `TBD` 结束。相关说明主要面向 Ubuntu 22.04、ROS 2 Humble，仿真器则要求 Windows ROS 2 Humble 与指定 Unity 版本。接手后应先固定一组已知提交，再在目标系统上重跑构建和硬件检查。
 - *把 Dockerfile 与包依赖对齐*。Dockerfile 对六个 ROS 仓库执行 `git clone --depth=1`，没有锁定提交；`rm_vision_bringup/package.xml` 又只声明 `rm_auto_aim` 与 `rm_serial_driver`，漏掉两套相机和云台描述，`rm_auto_aim` README 还引用了不存在的包名。当前镜像能找到这些组件，依赖的是 Dockerfile 手工克隆，而不是完整的包元数据。
 - *逐仓库看测试到底覆盖什么*。`rm_auto_aim` 的 workflow 会构建并运行 `colcon test`，但分类器基准测试没有断言，节点测试只检查构造不崩溃，跟踪包只有 lint；MindVision workflow 明确跳过测试，HikVision 与仿真器也没有当前版本中的功能或硬件 CI。先把这些边界分清，再补相机取流、TF、跟踪和 Unity 联通测试。
 - *沿 TF 发布者核对频率*。launch 虽为 `robot_state_publisher` 设置 `publish_frequency: 1000.0`，当前相机关节却是 fixed，`odom` $arrow.r$ `gimbal_link` 则是 floating，并由串口节点另行广播。这个参数不会把动态云台 TF 变成 1 kHz；要看真实更新率，仍得找到对应变换的发布者和数据源。
