@@ -363,7 +363,12 @@ nm -C main.o
 
 链接器的工作是将多个目标文件和库文件合并成一个可执行文件（或库）。这个过程包含两个核心任务：符号解析和重定位。
 
-符号解析（symbol resolution）把引用与可用定义匹配。普通强外部符号找不到定义时通常产生 `undefined reference`，出现不允许的多个强定义时通常产生 `multiple definition`。弱符号、COMDAT、模板和 `inline` 定义还有专门的合并规则，所以“唯一”应结合链接属性和单一定义规则理解。
+符号解析（symbol resolution）把引用与可用定义匹配。普通强外部符号的两类常见冲突是：
+
+- 找不到定义时，链接器通常报告 `undefined reference`。
+- 出现不允许的多个强定义时，链接器通常报告 `multiple definition`。
+
+弱符号、COMDAT、模板和 `inline` 定义还有专门的合并规则，所以“唯一”应结合链接属性和单一定义规则理解。
 
 ```bash
 # 未定义符号错误
@@ -568,7 +573,9 @@ cmake --build build
 
 ==== CMakeLists.txt：项目的构建描述
 
-CMake 的主要目录配置文件名为 `CMakeLists.txt`。在大小写敏感的文件系统上，`cmakelists.txt` 不会被当作该文件。子目录可以有自己的 `CMakeLists.txt`，但顶层不会自动遍历所有目录；只有通过 `add_subdirectory()` 等命令加入的目录才会参与配置。
+`CMakeLists.txt` 是 CMake 的主要目录配置文件。在大小写敏感的文件系统上，`cmakelists.txt` 不会被识别为同一个文件。
+
+子目录可以有自己的 `CMakeLists.txt`，但顶层配置不会自动遍历所有目录。只有通过 `add_subdirectory()` 等命令显式加入，子目录才会参与配置。
 
 `CMakeLists.txt` 是一个文本文件，包含一系列 CMake 命令。命令的基本格式是：
 
@@ -662,7 +669,14 @@ project(rm_vision
 )
 ```
 
-`VERSION` 指定项目版本，会设置 `PROJECT_VERSION`、`PROJECT_VERSION_MAJOR`、`PROJECT_VERSION_MINOR`、`PROJECT_VERSION_PATCH` 等变量。
+`VERSION` 指定项目版本，并设置下面四个变量：
+
+```text
+PROJECT_VERSION
+PROJECT_VERSION_MAJOR
+PROJECT_VERSION_MINOR
+PROJECT_VERSION_PATCH
+```
 
 `DESCRIPTION` 提供项目描述，存储在 `PROJECT_DESCRIPTION` 变量中。
 
@@ -702,7 +716,15 @@ add_executable(rm_vision
 
 第一个参数是 CMake 目标名称，后面是源文件列表。默认输出文件名通常取自目标名并带平台后缀，也可以通过 `OUTPUT_NAME` 等目标属性修改。
 
-源文件可使用相对于当前源目录的路径，也可使用绝对路径。应避免写死 `/home/alice/...` 这类机器路径；由 `${CMAKE_CURRENT_SOURCE_DIR}` 等变量计算出的绝对路径会随项目位置变化，本身并不破坏可移植性。
+源文件既可以使用相对于当前源目录的路径，也可以使用绝对路径。
+
+不要把某台机器的用户目录写死在配置里，例如：
+
+```text
+/home/alice/...
+```
+
+另一方面，通过 `${CMAKE_CURRENT_SOURCE_DIR}` 等目录变量计算出的绝对路径会随项目位置变化，本身并不破坏可移植性。
 
 ```cmake
 # 相对当前源目录
@@ -982,7 +1004,13 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")  # 递归搜索子目录
 add_executable(app ${SOURCES})
 ```
 
-CMake 文档不建议用普通 `file(GLOB)` 收集源文件，因为新增文件不会改变 `CMakeLists.txt`，构建系统也就没有必然触发重新配置的输入。新文件可能长期不进入目标，删除文件则可能造成陈旧配置或构建错误。显式列出文件会让新增和删除出现在代码审查差异中。
+CMake 文档不建议把普通 glob 用来收集源文件，也就是下面这种写法：
+
+```cmake
+file(GLOB SOURCES "src/*.cpp")
+```
+
+原因是新增文件不会改变 `CMakeLists.txt`，构建系统也就没有必然触发重新配置的输入。新文件可能长期不进入目标，删除文件则可能造成陈旧配置或构建错误。显式列出文件会让新增和删除出现在代码审查差异中。
 
 ```cmake
 # 推荐：手动列出源文件
@@ -1030,7 +1058,13 @@ if(ENABLE_FEATURE)
 endif()
 ```
 
-`if(ENABLE_FEATURE)` 会按变量或常量规则求值，未定义时为假。把它写成 `if(${ENABLE_FEATURE})` 会先做文本展开；空值、包含分号的值或恰好与另一个变量同名的值都可能改变参数结构和含义，因此不推荐这种写法。
+上例直接把变量名传给 `if`；CMake 会按变量或常量规则求值，未定义时为假。若改为先展开变量再传入，写法如下：
+
+```cmake
+if(${ENABLE_FEATURE})
+```
+
+此时，空值、包含分号的值或恰好与另一个变量同名的值，都可能改变参数结构和含义，因此不推荐这种写法。
 
 CMake 提供了丰富的条件操作符：
 
@@ -1886,7 +1920,13 @@ cmake --build . -j
 cmake --build . -j 2
 ```
 
-`CMAKE_BUILD_PARALLEL_LEVEL` 是 CMake 构建工具读取的环境变量，不是在 `CMakeLists.txt` 中用 `set()` 配置的项目变量。它适合由开发环境或 CI 按机器设置：
+控制统一构建调用并行上限的环境变量是：
+
+```text
+CMAKE_BUILD_PARALLEL_LEVEL
+```
+
+它由 CMake 构建工具读取，不是在 `CMakeLists.txt` 中用 `set()` 配置的项目变量，适合由开发环境或 CI 按机器设置：
 
 ```bash
 # 为这次统一构建调用设置并行上限
@@ -2215,7 +2255,11 @@ target_compile_definitions(rm_vision PRIVATE
 )
 ```
 
-上面的代码相当于在编译时添加 `-DDEBUG_MODE -DMAX_THREADS=8 -DPROJECT_VERSION="1.0.0"`。
+上面的代码相当于在编译时添加：
+
+```text
+-DDEBUG_MODE -DMAX_THREADS=8 -DPROJECT_VERSION="1.0.0"
+```
 
 在代码中可以使用这些宏：
 
@@ -2773,7 +2817,26 @@ cmake -S . -B build --graphviz=build/deps.dot
 dot -Tpng build/deps.dot -o build/deps.png
 ```
 
-依赖图适合查看目标关系，却不会完整展示每个源文件最终采用的编译参数。排查具体命令时，可以使用 `cmake --build build --verbose`；Ninja 和 Makefile 等生成器还可以通过 `CMAKE_EXPORT_COMPILE_COMMANDS=ON` 生成 `compile_commands.json`。`cmake --trace-expand` 能显示 CMake 脚本的调用及变量展开过程，但输出量很大，通常配合 `--trace-source=<file>` 缩小范围。
+依赖图适合查看目标关系，却不会完整展示每个源文件最终采用的编译参数。排查具体命令时，可以打开详细构建输出：
+
+```bash
+cmake --build build --verbose
+```
+
+Ninja 和 Makefile 等生成器还可以在配置时生成编译数据库：
+
+```bash
+cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+# 输出：build/compile_commands.json
+```
+
+若要查看 CMake 脚本调用及变量展开过程，可以使用跟踪选项：
+
+```bash
+cmake --trace-expand --trace-source=<file> -S . -B build
+```
+
+完整跟踪的输出量很大，因此通常用 `--trace-source` 限定到正在排查的文件。
 
 这一节的重点不是记住所有属性名，而是把要求放到真正需要它的目标上，并根据公共接口选择可见性。如果项目仍用 `CMAKE_CXX_FLAGS`、`include_directories()` 等全局设置，可以逐项确认影响范围，再迁移到 `target_compile_options`、`target_include_directories` 等目标级命令。这样更容易从配置中判断某个选项为何出现在一条编译或链接命令里。
 
@@ -2914,7 +2977,13 @@ RMCV/
     └── time_sync/
 ```
 
-这个示例没有统一的顶层 `include/`，而由各模块组织自己的头文件，再通过 `target_include_directories` 声明哪些目录供其他目标使用。这种布局适合主要在同一仓库内组合的模块；若某个库还要安装给外部项目使用，仍应明确区分可安装的公共头文件和仓库内部头文件，避免把整个源码目录都暴露出去。
+这个示例没有统一的顶层 `include/` 目录，各模块分别组织自己的头文件。供其他目标使用的目录，通过下面这个 CMake 命令声明：
+
+```text
+target_include_directories
+```
+
+这种布局适合主要在同一仓库内组合的模块；若某个库还要安装给外部项目使用，仍应明确区分可安装的公共头文件和仓库内部头文件，避免把整个源码目录都暴露出去。
 
 ==== add_subdirectory：包含子目录
 
@@ -2959,7 +3028,13 @@ target_link_libraries(RMCV2026 PRIVATE
 )
 ```
 
-当 CMake 执行 `add_subdirectory(plugin)` 时，会立即处理 `plugin/CMakeLists.txt`，完成后再继续当前文件。子目录创建的普通构建目标可以被项目其他目录引用；普通变量则遵循目录作用域：子目录会继承父目录当时的变量，但在子目录中修改普通变量不会自动改写父目录。确实需要返回数据时，可以重新考虑是否应建模为目标属性，或显式使用函数返回值、`PARENT_SCOPE` 等机制。
+下面这条命令会立即处理对应的子目录配置，完成后再继续当前文件：
+
+```cmake
+add_subdirectory(plugin)  # 处理 plugin/CMakeLists.txt
+```
+
+子目录创建的普通构建目标可以被项目其他目录引用；普通变量则遵循目录作用域：子目录会继承父目录当时的变量，但在子目录中修改普通变量不会自动改写父目录。确实需要返回数据时，可以重新考虑是否应建模为目标属性，或显式使用函数返回值、`PARENT_SCOPE` 等机制。
 
 `add_subdirectory` 还可以指定一个二进制目录，作为该子目录对应的构建树位置：
 
@@ -3013,7 +3088,22 @@ add_subdirectory(rmcv_bag)
 
 这里延续了前述“仓库内模块”的布局，因此把整个 `plugin` 目录作为构建接口公开。若其中混有不希望下游包含的实现头文件，应改成单独的公共目录；要安装和导出该库时，还要加入 `BUILD_INTERFACE`/`INSTALL_INTERFACE`，不能把源码绝对路径写进安装接口。
 
-注意这里使用了 `CMAKE_CURRENT_SOURCE_DIR`：它始终指向当前正在处理的 `CMakeLists.txt` 所在源码目录。`PROJECT_SOURCE_DIR` 指向最近一次 `project()` 调用对应的源码目录；若项目通过 `add_subdirectory` 引入另一个带有 `project()` 的子项目，它不一定等于最外层源码目录。最外层源码目录由 `CMAKE_SOURCE_DIR` 表示。选择变量时应先明确路径是相对当前模块、当前项目，还是整个构建入口。
+这里涉及三种源码目录变量。先把名称和下文用到的操作对应起来：
+
+```text
+构建脚本    CMakeLists.txt
+当前目录    CMAKE_CURRENT_SOURCE_DIR
+当前项目    PROJECT_SOURCE_DIR
+配置树顶层  CMAKE_SOURCE_DIR
+项目声明    project(...)
+引入子项目  add_subdirectory(...)
+```
+
+- “当前目录”是当前正在处理的构建脚本所在源码目录。
+- “当前项目”对应最近一次项目声明；引入带有独立项目声明的子项目后，它不一定等于最外层目录。
+- “配置树顶层”是最外层源码目录。
+
+选择变量时，应先明确路径是相对当前模块、当前项目，还是整个构建入口。
 
 硬件层的 CMakeLists.txt 展示了如何组织多个子模块：
 
@@ -3269,7 +3359,9 @@ target_link_libraries(my_project_detector PUBLIC rm_opencv)
 
 区分二者首先是为了说明兼容性边界：公共头文件属于使用接口，私有头文件可以随实现调整。其次，如果私有头文件没有被公共头文件间接包含，它的变化通常只触发库自身相关源文件重编译，不会让所有下游源文件都重编译。公开目录也为安装规则提供了明确范围。
 
-上例虽然用 Pimpl 隐藏了检测器的内部数据，但公共函数仍直接使用 `cv::Mat`、`cv::Point2f`，所以 OpenCV 依然是这个接口的公开依赖。相应目标应把 OpenCV 的头文件使用要求设为 `PUBLIC`；只有把这些类型也隔离出公共签名后，才可能将 OpenCV 降为纯实现依赖。
+上例用 Pimpl 隐藏了检测器的内部数据，但公共签名仍直接依赖 OpenCV。具体暴露的是 `cv::Mat` 和 `cv::Point2f` 这两个类型。
+
+因此，OpenCV 依然是这个接口的公开依赖。相应目标应把 OpenCV 的头文件使用要求设为 `PUBLIC`；只有把这些类型也隔离出公共签名后，才可能将 OpenCV 降为纯实现依赖。
 
 ==== 库与可执行文件的分离
 
@@ -3530,7 +3622,28 @@ if(TARGET RMCVSimulator::simulator)
 endif()
 ```
 
-`QUIET` 会抑制包未找到时通常产生的提示，但不会把语法错误、包配置内部错误等全部吞掉。检查目标比只检查一个变量更贴近后续需求：有些旧包只定义 `${CERES_LIBRARIES}` 等变量，这时应按该版本的文档适配，而不是假定 `Ceres_FOUND` 为真就一定存在 `Ceres::ceres`。源码应使用 `#if USE_CERES` 区分这里的 `1` 和 `0`，而不是使用只判断宏是否定义的 `#ifdef USE_CERES`。备用分支也必须确实有对应实现并经过测试；预处理宏本身不会自动生成“网格搜索”算法。
+`QUIET` 会抑制包未找到时通常产生的提示，但不会把语法错误、包配置内部错误等全部吞掉。
+
+检查目标比只检查一个变量更贴近后续需求。有些旧包只定义传统变量：
+
+```cmake
+${CERES_LIBRARIES}
+```
+
+这时应按该版本的文档适配，而不是假定 `Ceres_FOUND` 为真就一定存在下面这个导入目标：
+
+```cmake
+Ceres::ceres
+```
+
+源码还要区分宏的值，而不只是检查宏有没有定义：
+
+```cpp
+#if USE_CERES    // 能区分 1 和 0
+#ifdef USE_CERES // 只能判断是否定义
+```
+
+备用分支也必须确实有对应实现并经过测试；预处理宏本身不会自动生成“网格搜索”算法。
 
 ==== 模块化的目录结构
 
@@ -3789,7 +3902,15 @@ target_link_libraries(detector INTERFACE
 )
 ```
 
-下游目标链接 `detector` 后，会沿它的接口获得 `detector_traditional` 和 `detector_node` 各自声明的链接项与使用要求。接口库不会把两个实现合并成一个新的二进制库，也不会自动修正底层目标缺失的头文件路径或依赖声明。
+这里的统一接口和两个实现目标分别是：
+
+```text
+统一接口  detector
+实现目标  detector_traditional
+实现目标  detector_node
+```
+
+下游链接统一接口后，会沿它的接口获得两个实现目标各自声明的链接项与使用要求。接口库不会把两个实现合并成一个新的二进制库，也不会自动修正底层目标缺失的头文件路径或依赖声明。
 
 ==== CMake 辅助模块
 
@@ -4059,7 +4180,16 @@ message(STATUS "OpenCV libraries: ${OpenCV_LIBS}")
 
 `find_package` 有两种工作模式：Config 模式和 Module 模式。理解它们的区别有助于排查找不到库的问题。
 
-*Module 模式*使用 CMake 自带或项目放入 `CMAKE_MODULE_PATH` 的 `Find<Package>.cmake`。CMake 随附了 `FindThreads.cmake`、`FindOpenGL.cmake` 等模块；第三方项目也可以提供自己的 Find 模块。
+*Module 模式*使用 Find 模块。CMake 会查找自带模块，也会查找项目放入指定目录的模块；对应名称如下：
+
+```text
+项目搜索目录  CMAKE_MODULE_PATH
+模块文件形式  Find<Package>.cmake
+内置模块示例  FindThreads.cmake
+内置模块示例  FindOpenGL.cmake
+```
+
+第三方项目也可以提供自己的 Find 模块。
 
 ```cmake
 # CMake 自带的 Find 模块
@@ -4069,7 +4199,14 @@ find_package(OpenGL REQUIRED)    # 使用 FindOpenGL.cmake
 
 Module 模式的查找逻辑由该模块的作者决定，可能调用 `find_path`、`find_library` 或 pkg-config，并按约定设置结果变量和导入目标。
 
-*Config 模式*查找包安装时提供的 `<Package>Config.cmake` 或 `<package>-config.cmake`。这类文件通常由库项目生成并随开发文件安装：
+*Config 模式*查找包安装时提供的配置文件。文件名采用以下两种形式之一：
+
+```text
+<Package>Config.cmake
+<package>-config.cmake
+```
+
+这类文件通常由库项目生成并随开发文件安装：
 
 ```cmake
 # 使用库提供的 Config 文件
@@ -4138,7 +4275,28 @@ target_link_libraries(my_app PRIVATE Eigen3::Eigen)
 
 只要包正确声明了接口，链接导入目标就能同时获得其头文件路径、编译定义、编译特性和传递链接项。这里的“链接”也适用于 header-only 目标，并不表示一定会向链接器传入库文件。
 
-`Package::Target` 是常见命名习惯，却不是 CMake 根据包名自动生成的规则。目标名必须查阅包文档或配置文件。例如 `Eigen3::Eigen`、`Ceres::ceres` 和 `Threads::Threads` 很常见，而许多 OpenCV 安装提供的是 `OpenCV_LIBS` 变量以及 `opencv_core`、`opencv_imgproc` 等具体项，并不提供 `OpenCV::OpenCV` 或 `OpenCV::core`。
+`Package::Target` 是常见命名习惯，却不是 CMake 根据包名自动生成的规则。目标名必须查阅包文档或配置文件。常见例子包括：
+
+```text
+Eigen3::Eigen
+Ceres::ceres
+Threads::Threads
+```
+
+许多 OpenCV 安装提供的则是变量和具体链接项：
+
+```text
+OpenCV_LIBS
+opencv_core
+opencv_imgproc
+```
+
+这些安装不一定提供下面两个名字，不能按命名习惯猜测：
+
+```text
+OpenCV::OpenCV
+OpenCV::core
+```
 
 若希望项目内部统一使用一个目标，可以在查找 OpenCV 后封装其公开变量：
 
@@ -4220,7 +4378,9 @@ find_package(Threads REQUIRED)
 target_link_libraries(my_app PRIVATE Threads::Threads)
 ```
 
-`Threads::Threads` 可能携带线程库、编译/链接标志，也可能在无需额外参数的平台上为空。它避免把 `-pthread` 或 `pthread` 这样的工具链细节硬编码到项目中；它并不封装 `std::thread` 之外的一套 Windows API。
+`Threads::Threads` 可能携带线程库，也可能携带编译和链接标志。在不需要额外参数的平台上，这个目标也可能为空。
+
+`-pthread` 和 `pthread` 属于工具链细节，不应硬编码到项目中。使用这个导入目标可以避免这样做。不过，它并不封装 `std::thread` 之外的一套 Windows API。
 
 *Google Test* 是单元测试框架：
 
@@ -4276,7 +4436,7 @@ fmt 和 spdlog 也可能提供 header-only 目标或采用外部 fmt 的构建�
 
 ==== pkg-config：查找没有 CMake 支持的库
 
-有些库没有 CMake 包配置，但安装了 pkg-config 的 `.pc` 元数据。CMake 的 `FindPkgConfig` 模块可以读取这些信息：
+有些库没有 CMake 包配置，但安装了 pkg-config 元数据；这类文件以 `.pc` 结尾。CMake 可以通过 `FindPkgConfig` 模块读取这些信息：
 
 ```cmake
 find_package(PkgConfig REQUIRED)
@@ -4296,7 +4456,22 @@ target_link_libraries(my_app PRIVATE PkgConfig::LIBUSB)
 - `<PREFIX>_CFLAGS_OTHER`：未归入头文件路径的编译标志
 - `<PREFIX>_LDFLAGS_OTHER`：未归入库与库目录的链接标志
 
-使用 `IMPORTED_TARGET` 时，`PkgConfig::<PREFIX>` 会集中携带 pkg-config 返回的使用要求，通常比手工挑选若干变量完整。它的准确性仍受 `.pc` 文件约束：静态链接可能需要 `Libs.private`/`Requires.private`，交叉编译还必须配置目标 sysroot 对应的 `PKG_CONFIG_LIBDIR`，否则可能误用构建主机的库。可以用 `pkg-config --cflags --libs libusb-1.0` 辅助核对当前环境的原始结果。
+使用导入目标模式时，下面这个目标会集中携带 pkg-config 返回的使用要求，通常比手工挑选若干变量完整：
+
+```text
+PkgConfig::<PREFIX>
+```
+
+它的准确性仍受 `.pc` 文件约束，尤其要检查两类边界：
+
+- 静态链接可能还需要 `Libs.private` 或 `Requires.private` 中的依赖。
+- 交叉编译必须把 `PKG_CONFIG_LIBDIR` 配到目标 sysroot；否则可能误用构建主机的库。
+
+可以用下面的命令辅助核对当前环境返回的原始结果：
+
+```bash
+pkg-config --cflags --libs libusb-1.0
+```
 
 ==== FetchContent：下载并构建依赖
 
@@ -4346,6 +4521,7 @@ FetchContent_Declare(
 
 在常见的 CMake 依赖中，`FetchContent_MakeAvailable` 会先填充源码，再通过 `add_subdirectory` 处理依赖，使它定义的目标可供当前构建使用。较新 CMake 还支持依赖提供者和先尝试 `find_package` 等路径，因此具体行为与 CMake 版本及声明选项有关。无论哪种路径，都应在调用后检查需要的目标是否存在。
 
+#block(breakable: false)[
 可以一次处理多个依赖：
 
 ```cmake
@@ -4382,6 +4558,7 @@ target_link_libraries(my_app PRIVATE
     nlohmann_json::nlohmann_json
 )
 ```
+]
 
 有时候需要在 `MakeAvailable` 之前设置一些选项来控制依赖的构建：
 
@@ -4822,7 +4999,19 @@ install(TARGETS myapp
 )
 ```
 
-相对的 `DESTINATION` 会拼到 `CMAKE_INSTALL_PREFIX` 下，也更适合 `cmake --install --prefix` 和打包工具调整前缀。默认前缀由平台与 CMake 配置决定；Unix 主机上常见 `/usr/local`，但项目不应依赖某个写死的默认值。
+相对的 `DESTINATION` 会拼到下面这个安装前缀下：
+
+```text
+CMAKE_INSTALL_PREFIX
+```
+
+因此，安装命令和打包工具可以在部署时调整前缀，例如：
+
+```bash
+cmake --install <build-dir> --prefix <install-prefix>
+```
+
+默认前缀由平台与 CMake 配置决定；Unix 主机上常见 `/usr/local`，但项目不应依赖某个写死的默认值。
 
 运行安装：
 
@@ -4850,7 +5039,14 @@ cmake --install build
 
 ==== 使用 GNUInstallDirs
 
-不同平台、发行版和工具链对 `lib`、`lib64`、数据与配置目录的约定可能不同。`GNUInstallDirs` 提供一组可由调用者覆盖的相对目录变量：
+不同平台、发行版和工具链对库目录的约定可能不同，常见形式就有：
+
+```text
+lib/
+lib64/
+```
+
+数据与配置目录同样存在平台差异。`GNUInstallDirs` 提供一组可由调用者覆盖的相对目录变量：
 
 ```cmake
 include(GNUInstallDirs)
@@ -4937,7 +5133,25 @@ install(FILES
 )
 ```
 
-CMake 3.23 及以后还可以用 `target_sources(... FILE_SET HEADERS ...)` 记录公共头文件，并在 `install(TARGETS ... FILE_SET HEADERS ...)` 中安装。它能把头文件归属与目标放在一起，但采用前要相应提高 `cmake_minimum_required`；目录过滤和头文件集二选一即可，不必重复安装同一文件。
+CMake 3.23 及以后还可以用文件集记录公共头文件：
+
+```cmake
+target_sources(<target> PUBLIC FILE_SET HEADERS FILES <headers...>)
+```
+
+安装目标时再安装同一头文件集：
+
+```cmake
+install(TARGETS <target> FILE_SET HEADERS)
+```
+
+这种做法能把头文件归属与目标放在一起。采用文件集前，还要相应提高项目声明的最低 CMake 版本，也就是调整：
+
+```cmake
+cmake_minimum_required(...)
+```
+
+文件集和目录过滤二选一即可，不必重复安装同一文件。
 
 ==== 安装其他文件
 
@@ -4981,7 +5195,15 @@ install(TARGETS mylib
 )
 ```
 
-`EXPORT MyLibTargets` 把目标加入名为 `MyLibTargets` 的导出集。`INCLUDES DESTINATION` 会把安装后的公共头文件目录加入导出接口；若目标已经使用 `$<INSTALL_INTERFACE:...>` 声明了同一路径，应避免重复或不一致。目的地应保持为相对安装前缀的路径，不能把开发机的源码目录写进安装接口。
+这几项分别控制导出集和安装接口：
+
+```text
+EXPORT MyLibTargets
+INCLUDES DESTINATION <relative-include-dir>
+$<INSTALL_INTERFACE:...>
+```
+
+第一项把目标加入名为 `MyLibTargets` 的导出集；第二项把安装后的公共头文件目录加入导出接口。若目标已经通过第三项声明了同一路径，应避免重复或不一致。目的地应保持为相对安装前缀的路径，不能把开发机的源码目录写进安装接口。
 
 然后，安装导出集：
 
@@ -5027,7 +5249,13 @@ install(FILES
 )
 ```
 
-`@PACKAGE_INIT@` 会展开为用于计算包前缀和辅助宏的代码。`check_required_components(MyLib)` 会检查调用者请求的组件是否有对应的 `MyLib_<component>_FOUND` 值；没有组件的简单包可以保留它，但多组件包仍要在 Config 文件中正确设置各组件状态。
+Config 模板里的三项名称各有不同作用：
+
+- `@PACKAGE_INIT@`：展开为计算包前缀和提供辅助宏的代码。
+- `check_required_components(MyLib)`：检查调用者请求的组件状态。
+- `MyLib_<component>_FOUND`：前一项检查所读取的组件状态变量。
+
+没有组件的简单包可以保留这段检查，但多组件包仍要在 Config 文件中正确设置各组件状态。
 
 若 Config 模板还要引用安装后的数据目录，可通过 `PATH_VARS` 生成相对于包位置计算的变量，避免嵌入配置机器的绝对前缀：
 
@@ -5237,7 +5465,18 @@ add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE RMCore::rm_core)
 ```
 
-如果把 `rm_core` 改成静态库，或让公共头文件出现 `cv::Mat`，OpenCV 就可能成为消费者在链接或编译阶段必须恢复的依赖，Config 模板也要相应调用 `find_dependency(OpenCV ...)`。`SOVERSION` 只表达维护者承诺的共享库 ABI 世代；设置为主版本号不会自动使 ABI 稳定，仍需要符号与跨版本消费测试。
+下面两种接口变化都可能让 OpenCV 成为消费者必须恢复的依赖：
+
+- 把 `rm_core` 改成静态库，使实现依赖进入消费者的链接过程。
+- 让公共头文件出现 `cv::Mat`，使 OpenCV 进入消费者的编译接口。
+
+发生这种变化后，Config 模板要相应查找依赖：
+
+```cmake
+find_dependency(OpenCV ...)
+```
+
+`SOVERSION` 只表达维护者承诺的共享库 ABI 世代；设置为主版本号不会自动使 ABI 稳定，仍需要符号与跨版本消费测试。
 
 ==== 支持构建目录导出
 
@@ -5602,7 +5841,15 @@ my_package/
 - `depend`：同时覆盖 `build_depend`、`build_export_depend` 和 `exec_depend`
 - `test_depend`：只在测试时需要的依赖
 
-`<export>` 中的 `<build_type>` 告诉包识别工具采用哪种构建扩展，C++ 包常用 `ament_cmake`。依赖标签填写的是 ROS 包名或 rosdep 键，CMake 中的 `find_package(OpenCV)` 名称不一定可直接照搬。上例的 `libopencv-dev` 与 `eigen` 可在本机 ROS 2 Jazzy 包清单中找到；其他发行版与平台应通过已初始化的 `rosdep resolve` 和目标发行版索引核对。
+包的构建扩展写在 `<export>` 段中。对于 C++ 包，常见声明是：
+
+```xml
+<build_type>ament_cmake</build_type>
+```
+
+其中，`build_type` 告诉包识别工具采用哪种构建扩展。依赖标签填写的是 ROS 包名或 rosdep 键，CMake 中的 `find_package(OpenCV)` 名称不一定可直接照搬。
+
+上例的 `libopencv-dev` 与 `eigen` 可在本机 ROS 2 Jazzy 包清单中找到；其他发行版与平台应通过已初始化的 `rosdep resolve` 和目标发行版索引核对。
 
 ==== ament_cmake vs ament_python
 
@@ -5611,7 +5858,11 @@ ROS 2 常见的两种构建类型是：
 - `ament_cmake`：用于 C/C++ 包，基于 CMake
 - `ament_python`：用于纯 Python 包，使用 setuptools
 
-选择取决于源码语言和构建需求，而不是只按“性能高低”判断。C++ 目标采用 `ament_cmake`，纯 Python 包采用 `ament_python`；以 CMake 为主且需要安装 Python 模块时，可以引入 `ament_cmake_python`。
+选择取决于源码语言和构建需求，而不是只按“性能高低”判断：
+
+- C++ 目标通常采用 `ament_cmake`。
+- 纯 Python 包通常采用 `ament_python`。
+- 以 CMake 为主且需要安装 Python 模块时，可以引入 `ament_cmake_python`。
 
 ```xml
 <!-- C++ 包 -->
@@ -5638,6 +5889,7 @@ ROS 2 常见的两种构建类型是：
 
 ==== 基本的 CMakeLists.txt 结构
 
+#block(breakable: false)[
 一个最小的 `ament_cmake` C++ 包通常包含以下步骤：
 
 ```cmake
@@ -5665,6 +5917,7 @@ install(TARGETS my_node
 # 在安装与导出规则之后调用一次
 ament_package()
 ```
+]
 
 几个关键点：
 
@@ -5691,7 +5944,19 @@ ament_target_dependencies(my_node
 
 这不能机械地改写成一组 `${package_LIBRARIES}` 与 `${package_INCLUDE_DIRS}`：有的包导出 CMake 目标，有的保留传统变量，ament 还会处理工作空间覆盖层中的头文件顺序。本机 ROS 2 Jazzy 的宏会优先使用包导出的目标，否则读取约定变量；包必须事先以相同名称完成 `find_package`。
 
-传播范围对库尤其重要。Jazzy 的 `ament_target_dependencies` 默认按公开要求处理，并支持开头的 `PUBLIC` 或 `INTERFACE`，没有 `PRIVATE` 关键字。公共头文件确实引用 ROS 类型时可以显式写 `PUBLIC`；只在 `.cpp` 使用的依赖则应查看该包是否提供可用于 `target_link_libraries(... PRIVATE ...)` 的导入目标，或按目标发行版提供的接口处理，不能为了省事一律公开。
+传播范围对库尤其重要。ROS 2 Jazzy 的 `ament_target_dependencies` 有以下接口边界：
+
+- 默认按公开要求处理，也可以在开头写 `PUBLIC` 或 `INTERFACE`。
+- 这个宏没有 `PRIVATE` 关键字。
+- 公共头文件确实引用 ROS 类型时，可以显式写 `PUBLIC`。
+
+依赖若只在 `.cpp` 中使用，应先查看该包是否提供导入目标；有导入目标时，可以把私有关系写成：
+
+```cmake
+target_link_libraries(<target> PRIVATE <imported-target>)
+```
+
+若包没有这种接口，则按目标 ROS 2 发行版提供的方式处理，不能为了省事一律公开。
 
 但有时候你需要混合使用：
 
@@ -5884,7 +6149,12 @@ ament_export_targets(${PROJECT_NAME}Targets HAS_LIBRARY_TARGET)
 ament_export_dependencies(rclcpp sensor_msgs)
 ```
 
-`ament_export_targets` 会安排导出集的安装；默认命名空间通常是 `${PROJECT_NAME}::`，`HAS_LIBRARY_TARGET` 还会注册库路径相关的环境钩子。它不替代 `ament_export_dependencies`：导出目标若引用 `rclcpp` 或 `sensor_msgs` 提供的接口，消费包加载目标前仍要找到这些依赖。实现中使用、但不出现在公共头文件和静态链接接口中的依赖不应无条件导出。
+这两个导出命令负责的事情不同：
+
+- `ament_export_targets`：安排导出集的安装；默认命名空间通常是 `${PROJECT_NAME}::`。
+- `ament_export_dependencies`：让消费包在加载导出目标前恢复其公开依赖。
+
+指定 `HAS_LIBRARY_TARGET` 时，前一个命令还会注册库路径相关的环境钩子。导出目标若引用 `rclcpp` 或 `sensor_msgs` 提供的接口，仍要通过后一个命令声明这些依赖。实现中使用、但不出现在公共头文件和静态链接接口中的依赖不应无条件导出。
 
 ==== 消息和服务的生成
 
@@ -6094,7 +6364,13 @@ def generate_launch_description():
     ])
 ```
 
-安装 launch 文件还不够：`package.xml` 需要为运行时直接导入的 `launch`、`launch_ros` 和 `ament_index_python` 声明相应依赖。`get_package_share_directory` 查找的是已建立并加载环境的安装前缀；若工作空间尚未构建或当前 shell 未 source 对应 setup 文件，它会报告包未找到。
+安装 launch 文件还不够，`package.xml` 还要为运行时直接导入的三个包声明相应依赖：
+
+- `launch`
+- `launch_ros`
+- `ament_index_python`
+
+`get_package_share_directory` 查找的是已经建立并加载到环境中的安装前缀。若工作空间尚未构建，或当前 shell 尚未 source 对应的 setup 文件，它会报告包未找到。
 
 ==== 安装配置文件
 
@@ -6291,7 +6567,13 @@ colcon test-result --verbose
 colcon test --packages-select rm_vision
 ```
 
-相应的 `package.xml` 要声明 `ament_lint_auto`、实际启用的 lint 集合、`ament_cmake_gtest` 和 `launch_testing_ament_cmake` 等 `test_depend`。`colcon test` 运行已构建测试并记录结果；命令成功覆盖的是本次发现并执行的测试集合，不能证明未注册、被条件关闭或依赖外部硬件的路径已经验证。
+相应的 `package.xml` 要用 `test_depend` 声明本包实际使用的测试依赖，例如：
+
+- `ament_lint_auto` 以及实际启用的 lint 集合
+- `ament_cmake_gtest`
+- `launch_testing_ament_cmake`
+
+`colcon test` 会运行已构建的测试并记录结果。命令成功只覆盖本次发现并执行的测试集合，不能证明未注册、被条件关闭或依赖外部硬件的路径已经验证。
 
 ==== 完整示例：视觉节点的 CMakeLists.txt
 
@@ -7336,7 +7618,13 @@ endif()
 ```
 ]
 
-配置完成后还要实际运行 `ctest --test-dir build --output-on-failure`；测试目标存在或成功编译不等于测试已经执行。
+配置和构建完成后，还要实际运行测试：
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+测试目标存在或成功编译，不等于测试已经执行。
 
 *一种对应的项目结构*：
 

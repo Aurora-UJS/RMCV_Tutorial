@@ -273,7 +273,9 @@ bool isAutoAimEnabled = false;
 bool shouldShoot = isTargetDetected && isAutoAimEnabled;
 ```
 
-虽然逻辑上只需区分两个值，`bool` 仍是可独立寻址的对象类型；在常见实现中 `sizeof(bool)` 为 1，但具体对象布局和容器中的压缩方式由实现与类型决定。
+`bool` 在逻辑上只需区分两个值，但它仍是可独立寻址的对象类型。
+
+在常见实现中，`sizeof(bool)` 为 1。具体对象布局和容器中的压缩方式，则由实现与类型决定。
 
 在 C++ 中，布尔值可以隐式转换为整数（`false` 转为 0，`true` 转为 1），整数也可以隐式转换为布尔值（0 转为 `false`，非零值转为 `true`）。这种转换在条件语句中很常见：
 
@@ -584,7 +586,15 @@ x /= 4;   // 等价于 x = x / 4，x 变为 6
 x %= 4;   // 等价于 x = x % 4，x 变为 2
 ```
 
-复合赋值运算符不仅使代码更简洁，在某些情况下还能避免重复计算左侧表达式。例如，`array[computeIndex()] += 1` 只调用一次 `computeIndex()`，而 `array[computeIndex()] = array[computeIndex()] + 1` 会调用两次。
+复合赋值运算符不仅使代码更简洁，在某些情况下还能避免重复计算左侧表达式。例如，比较下面两种写法：
+
+```cpp
+array[computeIndex()] += 1;
+
+array[computeIndex()] = array[computeIndex()] + 1;
+```
+
+第一种写法只调用一次 `computeIndex()`，第二种写法则会调用两次。
 
 赋值表达式本身也有值，其值为赋值后左侧变量的值。这使得链式赋值成为可能：
 
@@ -1262,7 +1272,12 @@ double avg = average(x, y);  // 调用函数，传入参数 x 和 y
 std::cout << "平均值：" << avg << std::endl;
 ```
 
-调用时提供的表达式称为实参（argument），函数声明中接收它的位置称为形参（parameter）。两者怎样关联取决于形参类型：按值参数会得到自己的对象，引用参数则会绑定到已有对象。下一小节会把这一区别具体展开。
+调用函数时，需要区分两个位置：
+
+- *实参（argument）*：调用处提供的表达式。
+- *形参（parameter）*：函数声明中接收实参的位置。
+
+两者怎样关联取决于形参类型：按值参数会得到自己的对象，引用参数则会绑定到已有对象。下一小节会把这一区别具体展开。
 
 `return` 语句用于从函数返回一个值并结束函数执行。对于返回 `void` 的函数，可以使用不带值的 `return;` 提前退出，也可以让函数自然执行到末尾结束：
 
@@ -2402,7 +2417,12 @@ const int* const ptr = &x;
 // ptr = &y;   // 错误！
 ```
 
-记忆技巧是从右向左读：`const int* ptr` 读作“ptr 是指针，指向 const int”；`int* const ptr` 读作“ptr 是 const，是指针，指向 int”。
+记忆时可以从变量名向左读。把两种声明并排看，会更容易分清 `const` 修饰的是谁：
+
+```text
+const int* ptr  ：ptr 是指针，指向 const int
+int* const ptr  ：ptr 是 const 指针，指向 int
+```
 
 在函数参数中，`const` 指针用于表明函数不会修改传入的数据：
 
@@ -3213,11 +3233,19 @@ bool haveSameStoredValues(const Target& a, const Target& b) {
 }
 ```
 
-C++20 可以在类型内将相等运算符写成 `bool operator==(const Target&) const = default;`，让编译器按成员生成比较。无论手写还是默认生成，浮点成员的 `==` 都是精确比较；判断两个测量目标是否“足够接近”需要另写带单位和容差的领域函数，不能把两种语义混在一起。
+C++20 可以在类型内将相等运算符写成默认形式，让编译器按成员生成比较：
+
+```cpp
+bool operator==(const Target&) const = default;
+```
+
+无论手写还是默认生成，浮点成员的 `==` 都是精确比较；判断两个测量目标是否“足够接近”需要另写带单位和容差的领域函数，不能把两种语义混在一起。
 
 ==== 结构体的内存布局
 
-结构体对象不仅包含成员，还可能包含为了满足 ABI 对齐规则而加入的填充字节（padding）。对普通同访问级别的非零大小数据成员，地址顺序跟随声明顺序，但相邻成员不保证紧贴，结构体末尾也可能有填充，从而让结构体数组中的下一个元素正确对齐。
+结构体对象除了成员，还可能包含填充字节（padding）。这些字节用于满足 ABI 的对齐规则。
+
+对于具有相同访问级别的普通非零大小数据成员，地址顺序跟随声明顺序，但相邻成员不保证紧贴。结构体末尾也可能有填充，从而让结构体数组中的下一个元素正确对齐。
 
 具体对齐由目标平台 ABI 和类型决定。例如，一种常见 ABI 让 4 字节 `int` 按 4 字节边界对齐。为了满足成员与整个对象的对齐，编译器可能采用如下布局：
 
@@ -3344,7 +3372,9 @@ private:
 };
 ```
 
-现在三个操作都能直接访问 `Motor` 的表示，而外部不能绕过接口写入 `speed` 和 `temperature`。这提供了维护约束的入口；不过当前 `setTargetSpeed` 仍未校验范围，说明“字段私有”只是封装的手段，接口本身是否可靠仍要单独设计。
+上面的三个操作都能直接访问 `Motor` 的内部表示。外部代码则不能绕过接口，直接写入 `speed` 或 `temperature`。
+
+这提供了维护约束的入口。不过，`setTargetSpeed` 当前仍未校验范围。这说明“字段私有”只是封装的手段，接口本身是否可靠仍要单独设计。
 
 ==== 类的定义
 
@@ -3457,7 +3487,9 @@ void Target::print() const {
 }
 ```
 
-在类外部定义成员函数时，需要使用作用域解析运算符 `::` 指明函数属于哪个类。`Target::setPosition` 表示“Target 类的 setPosition 函数”。
+在类外部定义成员函数时，必须指明函数属于哪个类。这时要使用作用域解析运算符 `::`。
+
+`Target::setPosition` 就表示“Target 类的 setPosition 函数”。
 
 成员函数参数列表后的 `const` 会把其中的 `this` 视为指向常量对象，因此函数不能直接修改普通数据成员，也不能调用该对象的非常量成员函数。它仍可能修改外部状态或 `mutable` 成员，所以更准确的含义是“对这个对象提供 const 访问”：
 
@@ -6042,7 +6074,9 @@ int main() {
 
 尽管 `Infantry` 和 `Engineer` 都重新定义了 `performAction()`，但通过基类引用调用时，执行的始终是基类 `Robot` 的版本。这是因为编译器在编译时根据引用的静态类型（`Robot&`）决定调用哪个函数，而非根据实际对象的类型。这种绑定方式称为静态绑定或早绑定（static/early binding）。
 
-我们真正需要的是：让 `commandRobot` 函数根据传入对象的实际类型调用相应的 `performAction()` 版本。这就是动态绑定或晚绑定（dynamic/late binding），需要通过虚函数来实现。
+想让这个接口按对象的实际类型选择实现，需要把 `performAction()` 声明为虚函数。此后，`commandRobot` 仍只通过基类引用发起调用，具体版本则在运行时确定。
+
+这种机制称为动态绑定或晚绑定（dynamic/late binding）。
 
 ==== 虚函数
 
@@ -7247,7 +7281,16 @@ int main() {
 }
 ```
 
-输出接受 `const` 引用，因为写出文本不应改变向量；输入接受非 `const` 引用，因为成功后需要赋新值。两个运算符都返回原来的流引用，于是流状态会继续传播，`std::cout << v1 << '\n'` 和 `if (std::cin >> v2)` 也才能按熟悉的方式组合。若类型还要校验坐标范围，应先构造并验证完整候选值，再决定异常或流失败如何报告。
+输出接受 `const` 引用，因为写出文本不应改变向量；输入接受非 `const` 引用，因为成功后需要赋新值。两个运算符都返回原来的流引用，流状态因此会继续传播，下面的组合方式才能成立：
+
+```cpp
+std::cout << v1 << '\n';
+if (std::cin >> v2) {
+    // 读取成功
+}
+```
+
+若类型还要校验坐标范围，应先构造并验证完整候选值，再决定异常或流失败如何报告。
 
 ==== 递增递减运算符
 
@@ -7681,7 +7724,15 @@ int main() {
 }
 ```
 
-尖括号里的模板参数是元素类型，因此 `std::vector<double>`、`std::vector<std::string>` 和 `std::vector<Target>` 分别管理不同类型的对象。容器会拥有这些元素；复制整个 `vector` 通常也会复制其中的元素。
+尖括号里的模板参数是元素类型，因此同一个容器模板可以管理不同类型的对象：
+
+```cpp
+std::vector<double> measurements;
+std::vector<std::string> names;
+std::vector<Target> targets;
+```
+
+这三个容器分别保存 `double`、`std::string` 和 `Target` 对象。容器会拥有这些元素；复制整个 `vector` 通常也会复制其中的元素。
 
 访问时有两条不同契约。`operator[]` 要求调用者已经保证索引有效，`at()` 会检查并在越界时抛出 `std::out_of_range`：
 
@@ -8931,7 +8982,9 @@ std::for_each(v.begin(), v.end(), [&sum](int x) {
 
 这里按值捕获 `threshold`，lambda 保存自己的副本；`sum` 按引用捕获，所以调用会修改外部变量。若 lambda 被保存到更长生命周期或交给其他线程，引用捕获的生命周期与同步问题要重新检查，后文会专门展开。
 
-`<functional>` 还提供了一组常见运算函数对象。省略模板实参的透明形式（如 `std::greater<>`）能接受可比较的混合类型：
+`<functional>` 还提供了一组常见的运算函数对象。
+
+省略模板实参后，这类函数对象可以采用透明形式，接受可比较的混合类型。下面以 `std::greater<>` 为例：
 
 ```cpp
 #include <algorithm>
@@ -9943,7 +9996,13 @@ T maximum(const T& a, const T& b) {
 
 动态对象最难的往往不是取得地址，而是回答“谁负责让它活着，又由谁销毁”。把这份责任散落在多个 `new`、`delete`、提前返回和异常分支里，很容易漏掉一次或执行两次。
 
-智能指针是把动态对象所有权放进 RAII 对象的类模板。`unique_ptr` 表达独占，`shared_ptr` 表达共同拥有，`weak_ptr` 观察一个共享对象而不延长其生命。它们能自动执行与所有权相匹配的销毁动作，却不会自动修复共享环、悬空的非拥有指针、对象内部的数据竞争或错误的所有权图。若值成员、`vector` 或其他容器已经能直接拥有对象，也不必为了“现代 C++”再额外分配一层。
+智能指针是把动态对象所有权放进 RAII 对象的类模板。先按所有权关系区分三种常见类型：
+
+- `unique_ptr` 表达独占所有权；
+- `shared_ptr` 表达共同所有权；
+- `weak_ptr` 观察一个共享对象，但不延长它的生命。
+
+它们能自动执行与所有权相匹配的销毁动作，却不会自动修复共享环、悬空的非拥有指针、对象内部的数据竞争或错误的所有权图。若值成员、`vector` 或其他容器已经能直接拥有对象，也不必为了“现代 C++”再额外分配一层。
 
 ==== 原始指针的问题
 
@@ -10411,7 +10470,12 @@ CameraPtr openCamera(const char* device) {
 }
 ```
 
-`openCamera` 用空指针表示库报告的打开失败，成功句柄离开作用域时调用 `camera_close`。真实封装还要按照该硬件 API 的线程、关闭次序和错误码契约补齐行为。
+这段封装约定了两种结果：
+
+- 打开失败时，`openCamera` 返回空指针；
+- 打开成功时，句柄离开作用域，删除器调用 `camera_close`。
+
+真实封装还要按照该硬件 API 的线程、关闭次序和错误码契约补齐行为。
 
 ==== enable_shared_from_this
 
@@ -10431,7 +10495,7 @@ auto ptr1 = std::make_shared<BadExample>();
 auto ptr2 = ptr1->getShared();
 ```
 
-两个控制块最终都会尝试删除同一对象，行为未定义。`std::enable_shared_from_this<T>` 让对象连接到原有控制块：
+两个控制块最终都会尝试删除同一对象，行为未定义。正确做法是继承标准库提供的 `enable_shared_from_this` 基类，让对象连接到原有控制块。完整写法如下：
 
 ```cpp
 #include <iostream>
@@ -11736,9 +11800,18 @@ commitSharedState();
 lock.unlock();
 ```
 
-`try_lock_for` 和 `try_lock_until` 不是普通 `std::mutex` 的成员；需要定时尝试时要使用 `std::timed_mutex` 等支持定时锁定的类型。即便加上超时，程序仍要定义超时后保留旧状态、重试还是报告失败。
+普通 `std::mutex` 不支持定时尝试加锁。需要这个能力时，应使用 `std::timed_mutex` 等定时互斥量。两个接口分别接收相对时长和绝对时刻：
 
-需要同时锁住多把互斥量时，逐把按不一致顺序获取可能死锁。C++17 的 `std::scoped_lock` 会使用避免死锁的锁定算法，并在作用域结束时全部释放：
+```cpp
+timedMutex.try_lock_for(timeout);     // 相对时长
+timedMutex.try_lock_until(deadline);  // 绝对时刻，另一种选择
+```
+
+即便加上超时，程序仍要定义超时后保留旧状态、重试还是报告失败。
+
+逐把获取多把互斥量时，如果各处采用的顺序不一致，就可能死锁。
+
+从 C++17 开始，可以使用 `std::scoped_lock`。它会采用避免死锁的锁定算法，并在作用域结束时全部释放：
 
 ```cpp
 std::mutex leftMutex;
@@ -11832,7 +11905,13 @@ int main() {
 }
 ```
 
-常见操作包括 `load`、`store`、`exchange`、`fetch_add` 和比较交换。`compare_exchange_*` 失败时会把实际值写回 `expected`，因此循环通常写成：
+常见原子操作可以先按用途分成三组：
+
+- 读取和写入：`load`、`store`；
+- 替换和累加：`exchange`、`fetch_add`；
+- 条件更新：`compare_exchange_*`。
+
+比较交换失败时，会把实际值写回 `expected`，因此循环通常写成：
 
 ```cpp
 int expected = value.load();
@@ -13093,7 +13172,12 @@ target_compile_features(ceres_demo PRIVATE cxx_std_17)
 target_link_libraries(ceres_demo PRIVATE Ceres::ceres)
 ```
 
-稀疏求解器能否使用取决于这份 Ceres 的构建依赖。`find_package` 成功不表示 SuiteSparse、CUDA 或所有线性求解器都已启用；需要时检查 CMake 输出与 `Solver::Summary` 中的实际配置。
+稀疏求解器能否使用，取决于这份 Ceres 的构建依赖。上面的包查找成功，只说明 CMake 找到了 Ceres；它并不表示 SuiteSparse、CUDA 或各类线性求解器都已启用。
+
+项目依赖这些能力时，应检查两处信息：
+
+- CMake 的配置输出；
+- `Solver::Summary` 中记录的实际配置。
 
 ==== 非线性最小二乘问题
 
@@ -13244,7 +13328,15 @@ double translation[3] = {0.0, 0.0, 1.0};
 problem.AddParameterBlock(translation, 3);
 ```
 
-`Eigen::Quaterniond::coeffs().data()` 的内存顺序通常是 `[x, y, z, w]`，与上面的 Ceres 顺序不同。直接优化 Eigen 的系数存储时，应使用 Ceres 对应版本提供的 `EigenQuaternionManifold`，并再次核对版本文档；名字里的 “Eigen” 正是在提醒这项布局差异。
+常见版本里，Ceres 和 Eigen 的四元数系数布局可以这样对照：
+
+```text
+ceres::QuaternionManifold             [w, x, y, z]
+Eigen::Quaterniond::coeffs().data()   [x, y, z, w]
+ceres::EigenQuaternionManifold        适配 Eigen 的系数顺序
+```
+
+直接优化 Eigen 的系数存储时，应使用当前 Ceres 版本提供的对应流形，并再次核对版本文档。第三行名字里的 “Eigen”，正是在提醒这项布局差异。
 
 流形维持表示约束，不保证初始数组自动有效。初始四元数应有限且归一化，也要避免接近零。优化后 `q` 与 `-q` 表示同一旋转，验证时应比较旋转作用或相对旋转，而不是逐系数要求同号。
 
@@ -13521,7 +13613,17 @@ options.minimizer_progress_to_stdout = true;
 
 OpenCV 是机器人视觉里最常见的工具箱之一：读相机、转换颜色、找轮廓、做透视变换和运行神经网络，都能在同一套接口里完成。本节不打算把两千多个函数排成字典，而是沿着仓库里的一个装甲板演示，先认识 `cv::Mat`，再把“亮斑—灯条—配对—分类”串成一条能观察每级输出的流水线。
 
-配套素材位于 `examples/test.mp4`，程序在 `examples/cpp/color_spaces.cpp` 和 `examples/cpp/lightbar_pipeline.cpp`，模型及来源说明位于 `examples/cpp/model/`。示例中的相对路径以 `examples/cpp/` 为工作目录。安装了 OpenCV 4 开发包后，可以这样编译：
+配套素材、程序和模型的位置如下：
+
+```text
+视频素材      examples/test.mp4
+颜色空间示例  examples/cpp/color_spaces.cpp
+灯条流水线    examples/cpp/lightbar_pipeline.cpp
+模型与说明    examples/cpp/model/
+工作目录      examples/cpp/
+```
+
+示例中的相对路径都以上面列出的工作目录为基准。安装了 OpenCV 4 开发包后，可以这样编译：
 
 ```bash
 g++ -std=c++17 -O2 color_spaces.cpp -o color_spaces \
@@ -13636,7 +13738,7 @@ HSV 能把色相、饱和度和亮度分开观察，却没有保证 H 在所有�
 - *亮度候选*：灰度图按阈值二值化，先找出亮区域，不在这一步决定阵营。
 - *灯条筛选*：对轮廓拟合旋转矩形，用长度、宽长比和倾角筛出“像灯条”的候选，再统计颜色证据。
 - *几何配对*：只在目标颜色中配对，检查两灯条长度、连线倾角和归一化间距。
-- *图案分类*：把候选中间区域透视展开，交给随仓库提供的多层感知机（multilayer perceptron，MLP），拒绝 `negative` 或分数不足的候选。
+- *图案分类*：multilayer perceptron 是多层感知机的英文名称，简称 MLP。示例先把候选中间区域透视展开，再交给仓库随附的 MLP；分类器会拒绝 `negative` 或分数不足的候选。
 
 这些阶段不是从“宽松”自动走向“真相”。每加一条规则都会同时改变假阳性和假阴性；分类器也只在训练分布与预处理一致的程度上有意义。把每级中间结果画出来，正是为了看见错误在哪一级进入、又在哪一级被保留或误删。
 
@@ -13731,7 +13833,13 @@ candidate center=(798, 496) -> guard 99.9%
 
 因此串口程序其实有三层责任：termios 配置决定内核怎样交付字节，协议编码决定两端怎样解释字节，状态机决定怎样从半包、粘包和损坏中恢复。任何一层“差不多”都可能让另一端读出一个数值正常、含义却完全错误的命令。
 
-仓库的 `examples/cpp/serial_loopback.cpp` 是一份紧凑的伪终端（pseudo-terminal，pty）回环演示，便于观察原始模式、CRC 和逐字节解析。本节会先说明它验证了什么，再给出更适合长期协议的显式编码方式。
+仓库提供了一份紧凑的伪终端（pseudo-terminal，pty）回环演示：
+
+```text
+examples/cpp/serial_loopback.cpp
+```
+
+它便于观察原始模式、CRC 和逐字节解析。本节会先说明它验证了什么，再给出更适合长期协议的显式编码方式。
 
 ==== 打开并配置串口
 
@@ -13793,7 +13901,14 @@ int openSerial(const char* path) {
 
 ==== 定义帧：先定义线上字节
 
-把 `#pragma pack(1)` 的结构体直接写到串口很诱人，却把协议绑定到编译器布局、字节序、浮点格式和字段对齐。`static_assert(sizeof(Frame) == 11)` 只能确认本次编译的大小，不能说明另一端怎样解释每个 float，也不能提供版本迁移。
+用下面两行约束结构体，再把它直接写到串口，看起来很省事：
+
+```cpp
+#pragma pack(1)
+static_assert(sizeof(Frame) == 11);
+```
+
+但这种做法会把协议绑定到编译器布局、字节序、浮点格式和字段对齐。大小断言只能确认本次编译得到的结构体尺寸；它不能说明另一端怎样解释每个 `float`，也没有为后续版本定义兼容或迁移方式。
 
 更稳妥的起点是先画出线上格式。下面定义一个固定 13 字节的小端帧：
 
