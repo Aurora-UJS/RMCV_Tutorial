@@ -374,7 +374,14 @@ ros2 launch rm_vision_demo vision_decision.launch.py
 <exec_depend>launch_ros</exec_depend>
 ```
 
-重新执行 `colcon build --packages-select rm_vision_demo --symlink-install` 并加载工作空间后，ROS 2 才能从安装目录找到新增的 launch 文件。
+新增 launch 文件后，重新构建并加载工作空间：
+
+```bash
+colcon build --packages-select rm_vision_demo --symlink-install
+source install/setup.bash
+```
+
+这样 ROS 2 才能从安装目录找到新增的 launch 文件。
 
 ==== 参数文件与多场景配置
 
@@ -409,7 +416,7 @@ detector_config = PathJoinSubstitution([
 parameters=[detector_config]
 ```
 
-节点还必须在 C++ 中使用 `declare_parameter` 声明并读取 `threshold`、`max_lost_frames` 等参数，否则 YAML 中的数值不会改变算法行为。完成这部分接入后，修改参数文件通常不需要重新编译 C++，但需要重新启动节点才能重新读取启动参数。如果希望 `ros2 param set` 在运行期间改变行为，还要验证新值并让算法读取更新后的参数：可以注册参数更新回调并同步受影响的状态，也可以在使用时重新读取。只在构造函数中缓存一次参数不会自动更新。
+C++ 节点还必须声明并读取 YAML 中的参数，例如 `threshold` 和 `max_lost_frames`；可以用 `declare_parameter` 完成声明。否则，参数文件里的数值不会改变算法行为。完成这部分接入后，修改参数文件通常不需要重新编译 C++，但需要重新启动节点才能重新读取启动参数。如果希望 `ros2 param set` 在运行期间改变行为，还要验证新值并让算法读取更新后的参数：可以注册参数更新回调并同步受影响的状态，也可以在使用时重新读取。只在构造函数中缓存一次参数不会自动更新。
 
 ==== 命名空间与重映射
 
