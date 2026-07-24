@@ -4316,7 +4316,7 @@ wget --limit-rate=1M https://example.com/file.zip
 
 `-O` 会写入指定路径，已有文件可能被覆盖；`-c` 对错误的本地残片或已经变化的远端文件也可能产生无效结果。下载发布物时优先写入新名称，并用发布方独立提供的 SHA-256 或签名核验。递归抓取还要遵守站点条款、访问频率和存储范围。
 
-`curl` 功能更丰富，支持更多协议，常用于 API 调用和脚本：
+`curl` 功能更丰富，支持更多协议，常用于调用应用程序编程接口（application programming interface，API）和编写网络脚本：
 
 ```bash
 # 下载文件（默认输出到标准输出）
@@ -6416,7 +6416,7 @@ ldconfig -p | grep -F 'libopencv'
 nm -D -C /path/to/libopencv_imgcodecs.so | grep -F 'cv::imread'
 ```
 
-`undefined reference` 发生在链接阶段。未链接实现库是常见原因，但静态库顺序、头文件与库版本不一致、C++ ABI、条件宏和函数签名不一致也会产生相似结果。把详细链接行中的对象文件、`-L`、库名和顺序与 `find_package` 的结果对应起来，再修改 `target_link_libraries`；仅看到系统里存在某个 `.so` 还不能确定当前链接使用了它。
+`undefined reference` 发生在链接阶段。未链接实现库是常见原因，但静态库顺序、头文件与库版本不一致、C++ 应用二进制接口（application binary interface，ABI）、条件宏和函数签名不一致也会产生相似结果。ABI 涵盖调用约定、符号命名和对象布局等二进制规则；源码接口相同，不代表不同工具链或不兼容选项生成的目标文件可以直接混用。把详细链接行中的对象文件、`-L`、库名和顺序与 `find_package` 的结果对应起来，再修改 `target_link_libraries`；仅看到系统里存在某个 `.so` 还不能确定当前链接使用了它。
 
 *运行时找不到共享库*
 

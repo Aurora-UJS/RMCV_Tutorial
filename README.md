@@ -22,7 +22,7 @@
 typst compile --font-path fonts main.typ
 ```
 
-字体链设计为缺字体时**优雅降级**：Fira Mono 之后有 Typst 内嵌的 DejaVu Sans Mono 兜底，LXGW 之后有 Noto Sans Mono CJK SC 兜底，任何机器上编译代码都不会退化成衬线字体。但要产出与 CI 一致的正式版本，请装齐上表字体。
+代码字体按 Fira Mono、DejaVu Sans Mono、LXGW 和 Noto CJK 候选依次回退；实际选中的字形取决于 Typst 版本和构建机已安装的字体。要产出与项目持续集成（CI）一致的正式版本，请使用工作流中的 Typst 版本并装齐上表字体。
 
 ## 仓库结构
 
@@ -38,7 +38,7 @@ web/index.html        # GitHub Pages 在线阅读器（pdf.js）
 
 ## 持续集成
 
-推送到 `main` 后，GitHub Actions 会用 pin 版本的 Typst 和上表字体从源码编译 PDF 并部署到 GitHub Pages，见 [.github/workflows/deploy-pages.yml](.github/workflows/deploy-pages.yml)。发布产物以 CI 构建为准。
+推送到 `main` 后，GitHub Actions 会用固定版本的 Typst 和上表字体从源码编译 PDF 并部署到 GitHub Pages，见 [.github/workflows/deploy-pages.yml](.github/workflows/deploy-pages.yml)。发布产物以 CI 构建为准。
 
 ## 许可
 
