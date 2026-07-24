@@ -16,10 +16,20 @@
 # a bounded-acceleration trajectory cannot follow the discontinuous reference.
 #
 # Generates chapters/4.Application/images/app-autoaim-trajectory.png
+from pathlib import Path
+
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from scipy.optimize import lsq_linear
+
+OUTPUT_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "chapters"
+    / "4.Application"
+    / "images"
+    / "app-autoaim-trajectory.png"
+)
 
 mpl.rcParams.update({"font.size": 10.5})
 
@@ -142,7 +152,6 @@ axe.set_xlabel("time  t  [s]")
 axe.set_ylim(0, err.max() * deg * 1.1)
 axe.set_xlim(0, T)
 
-fig.savefig("chapters/4.Application/images/app-autoaim-trajectory.png",
-            bbox_inches="tight", facecolor="white")
+fig.savefig(OUTPUT_PATH, bbox_inches="tight", facecolor="white")
 print(f"saved app-autoaim-trajectory.png  availability={availability*100:.1f}%  "
       f"max|err|={err.max()*deg:.2f}deg  a_max_used={np.abs(u).max():.1f}")

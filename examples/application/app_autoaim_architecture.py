@@ -6,9 +6,19 @@
 # odom->gimbal_link whenever a valid receive packet arrives.
 # Timing annotations show the staggered start (serial +1.5 s, tracker +2.0 s).
 # Generates chapters/4.Application/images/app-autoaim-architecture.png
+from pathlib import Path
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch, Rectangle
+
+OUTPUT_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "chapters"
+    / "4.Application"
+    / "images"
+    / "app-autoaim-architecture.png"
+)
 
 BLUE, MAGENTA, GRAY = "#3B6FD4", "#D6336C", "#8A8A8A"
 GREEN, ORANGE, INK = "#2F9E44", "#E8890C", "#222222"
@@ -136,6 +146,5 @@ ax.set_title("rm_vision snapshot: independent TF inputs and launch timing",
              fontsize=11.5, fontweight="bold", pad=8)
 
 fig.tight_layout()
-fig.savefig("chapters/4.Application/images/app-autoaim-architecture.png",
-            bbox_inches="tight", facecolor="white")
+fig.savefig(OUTPUT_PATH, bbox_inches="tight", facecolor="white")
 print("saved app-autoaim-architecture.png")
