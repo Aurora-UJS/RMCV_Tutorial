@@ -24,8 +24,12 @@ sp_vision 的 README 用一个具体约束解释了它的软件架构。步兵�
 - `tasks/`：功能层。`auto_aim/`、`auto_buff/`、`omniperception/`（哨兵全向感知）。
 - `src/`：应用层，每个兵种或调试场景一个 `main`——`standard.cpp`、`sentry.cpp`、`uav.cpp`、`mt_standard.cpp`（多线程版步兵）等，共 13 个源文件。
 - `tools/`：可复用工具，包括扩展卡尔曼滤波器（EKF）、循环冗余校验（CRC）、线程安全队列、弹道、日志、YAML、绘图和录制器。
-- `tests/`：从 `camera_test` 到 `planner_test_offline`，共 21 个测试源文件。其中 `publish_test`、`subscribe_test` 和 `topic_loop_test` 只在 ROS 2 相关依赖齐全时加入构建；相机、CAN、串口与 IMU 等测试还需要对应硬件，不能把“有独立入口”理解为在任意机器上都能完成有效测试。
-- `configs/`：机器人与场景的 YAML 配置——`standard3.yaml`、`standard4.yaml`、`sentry.yaml`、`demo.yaml` 等。
+- `tests/`：共有 21 个测试源文件，覆盖相机测试、离线规划测试和 ROS 2 通信等入口。相机测试名为 `camera_test`，离线规划测试名为 `planner_test_offline`。ROS 2 的发布、订阅和话题循环测试只在相关依赖齐全时加入构建，对应入口为 `publish_test`、`subscribe_test` 和 `topic_loop_test`。相机、CAN、串口与 IMU 等测试还需要对应硬件，不能把“有独立入口”理解为在任意机器上都能完成有效测试。
+- `configs/`：存放机器人与场景的 YAML 配置。示例包括：
+  - `standard3.yaml`
+  - `standard4.yaml`
+  - `sentry.yaml`
+  - `demo.yaml`
 
 目录也把本章的取舍说清了：仓库不只有普通自瞄，还包括打符、哨兵全向感知、标定、部署和各类硬件测试。为了和前两个项目比较同一条自瞄主线，下面会重点沿 `mt_standard.cpp` 进入识别、跟踪、规划和通信；没有逐段展开的模块仍然属于仓库，不能据此写成“项目没有提供”。
 
@@ -46,6 +50,7 @@ Eigen::Quaterniond q = cboard.imu_at(t - 1ms);  // 按时间戳取当时的云�
 
 旧的是 `io::CBoard`，走 SocketCAN（USB2CAN 转接）。下发的数据结构 `io::Command` 只有五个字段：`control`、`shoot`、`yaw`、`pitch`、`horizon_distance`，打包进一帧 8 字节 CAN 报文——两个布尔各占一字节，三个量各按 $times 10^4$ 存成 `int16_t`，正好 8 字节，一个字节不剩。
 
+#block(breakable: false)[
 新的是 `io::Gimbal`，走 MicroUSB 虚拟串口，发送结构体定义如下：
 
 ```cpp
@@ -57,6 +62,7 @@ struct __attribute__((packed)) VisionToGimbal {
   uint16_t crc16;
 };
 ```
+]
 
 在上下位机都采用 4 字节 `float` 的 ABI 时，`packed` 布局中的帧头占 2 字节、模式占 1 字节、六个 `float` 共 24 字节、CRC 占 2 字节，合计 29 字节，已经放不进一帧经典 CAN 的 8 字节数据区。仓库改用 MicroUSB 虚拟串口，省去了自行分包和重组的工作；如果换成 CAN FD 或设计分包协议，CAN 仍然可以承载这些信息。因此，更准确的结论是“当前结构体不适合单帧经典 CAN”，而不是“加入前馈就只能使用串口”。
 
@@ -64,9 +70,20 @@ struct __attribute__((packed)) VisionToGimbal {
 
 再往下读一层还能看到，发送端没有检查 `serial_.write()` 实际写入多少字节，接收辅助函数也只调用一次 `serial_.read()`，没有一次读满就返回失败。串口在目标机器上是否真的出现过短写或短读，需要运行日志才能回答；从接口设计看，更稳妥的做法是明确字段宽度、端序和浮点表示，断言精确帧长，并循环完成剩余读写；也可以把这些工作交给专门的协议收发层，由它负责收满整帧、寻找帧头并完成校验。
 
-开火没有单独占一个线上的标志位，而是编码进 `mode`：0 不控制、1 控制但不开火、2 控制且开火。`send(bool control, bool fire, ...)` 用 `tx_data_.mode = control ? (fire ? 2 : 1) : 0;` 做映射，所以这个入口不会产生“不控制但开火”的组合。要注意，这只是入口函数帮调用者避开了一种无效组合：线上的字段仍是 `uint8_t`，另一个重载也允许直接传入 `VisionToGimbal`，类型本身没有把非法值排除掉。
+开火没有单独占一个线上的标志位，而是编码进 `mode`。它有三种约定值：0 表示不控制，1 表示控制但不开火，2 表示控制且开火。入口函数 `send(bool control, bool fire, ...)` 通过下面的三元表达式完成映射：
 
-回传方向的 `GimbalToVision` 包含模式、四元数 `q[4]`、`yaw`／`yaw_vel`／`pitch`／`pitch_vel`、`bullet_speed`、`bullet_count` 与 CRC；在同一 4 字节 `float` ABI 下共 43 字节。`auto_aim_debug_mpc.cpp` 和 `gimbal_test.cpp` 用 `current > last` 比较当前与上一次 `bullet_count`，判断下位机是否报告了新发弹事件；`standard_mpc.cpp` 只声明了 `last_bullet_count`，没有实际比较。
+```cpp
+tx_data_.mode = control ? (fire ? 2 : 1) : 0;
+```
+
+因此，这个入口不会产生“不控制但开火”的组合。不过，它只替调用者避开了这一种无效组合：线上的字段仍是 `uint8_t`，另一个重载也允许直接传入 `VisionToGimbal`，类型本身没有把其他非法值排除掉。
+
+回传方向使用 `GimbalToVision`。它依次携带模式、四元数 `q[4]`、四个云台状态字段（`yaw`、`yaw_vel`、`pitch`、`pitch_vel`）、`bullet_speed`、`bullet_count` 与 CRC。在同一 4 字节 `float` ABI 下，这个包共 43 字节。
+
+再看弹丸计数的使用方式，三个文件并不相同：
+
+- `auto_aim_debug_mpc.cpp` 与 `gimbal_test.cpp`：通过 `current > last` 比较当前值与上一次 `bullet_count`，判断下位机是否报告了新发弹事件。
+- `standard_mpc.cpp`：只声明了 `last_bullet_count`，没有实际比较。
 
 这个细节很适合用来检查边界：`bullet_count` 是 `uint16_t`，从 65535 回绕到 0 时，简单的大小比较会漏掉一次变化，长期运行的代码应使用无符号序号差或约定清楚的回绕规则。计数器能区分“上位机发出了开火命令”和“下位机报告新增一发”，但它不能说明未发弹究竟是热量限制、弹仓状态还是机构故障；若要诊断，还需要更具体的状态字段。
 
@@ -200,7 +217,11 @@ Eigen::VectorXd R_dig{
 
 ==== 两类硬边界与一项残差窗口规则
 
-模型运行起来以后，还要判断什么时候不该继续相信它。常规 `Tracker::track(armors, t)` 路径里有三项检查：
+模型运行起来以后，还要判断什么时候不该继续相信它。常规路径里有三项检查，入口是：
+
+```cpp
+Tracker::track(armors, t)
+```
 
 ```cpp
 if (state_ != "lost" && dt > 0.1) {              // 一、两帧间隔超 100 ms
@@ -210,7 +231,8 @@ if (state_ != "lost" && dt > 0.1) {              // 一、两帧间隔超 100 ms
 if (state_ != "lost" && target_.diverged()) {    // 二、物理量跑出合理范围
   state_ = "lost"; return {};
 }
-if (std::accumulate(target_.ekf().recent_nis_failures.begin(),   // 三、残差窗口
+// 三、残差窗口
+if (std::accumulate(target_.ekf().recent_nis_failures.begin(),
                     target_.ekf().recent_nis_failures.end(), 0)
     >= (0.4 * target_.ekf().window_size)) {
   tools::logger()->debug("[Target] Bad Converge Found!");
@@ -339,7 +361,21 @@ cv::Point2f img_center(1440 / 2, 1080 / 2);  // TODO
 
 *默认弹速与有效范围不一致。* 规划器在弹速小于 10 或大于 25 m/s 时改用 22，普通瞄准器在小于 14 m/s 时改用 23，打符瞄准器在小于 10 m/s 时改用 24。于是同样输入 12 m/s，规划器和打符路径保留原值，普通瞄准器却替换为 23。`standard_mpc.cpp` 与 `standard.cpp` 分属不同程序，影响尚且隔开；`mt_standard.cpp` 同时包含普通自瞄和打符，切换模式就会改变同一输入的解释。最好集中定义默认值、有效范围和数据来源，并用 10、14、25 m/s 这些边界值覆盖模式切换测试。
 
-*识别模型能复现到哪一步。* README 引用了深圳大学 RobotPilots 与北京科技大学 Reborn 的识别工作。机器人配置选择 `yolov5` 时，实际加载的是 OpenVINO 中间表示（Intermediate Representation，IR）的 `assets/yolov5.xml`，权重数据在 `assets/yolov5.bin`。仓库另有分类器使用的 `tiny_resnet.onnx`，还有一个没有被固定提交源码和配置引用的 `best2-sim.onnx`；不能只看扩展名，就把后者当作当前 YOLOv5 的可转换源模型。
+*识别模型能复现到哪一步。* README 引用了两支团队的识别工作：
+
+- 深圳大学 RobotPilots
+- 北京科技大学 Reborn
+
+仓库使用 OpenVINO 的中间表示（Intermediate Representation，IR）部署 YOLOv5。
+
+机器人配置选择 `yolov5` 时，各文件用途如下：
+
+- `assets/yolov5.xml`：网络结构描述，也是程序传给 OpenVINO 的加载入口。
+- `assets/yolov5.bin`：与上述 XML 配套的权重数据。
+- `tiny_resnet.onnx`：仓库分类器使用的模型。
+- `best2-sim.onnx`：没有被固定提交中的源码或配置引用。
+
+因此，不能只看扩展名，就把 `best2-sim.onnx` 当作当前 YOLOv5 的可转换源模型。
 
 issue #7 曾索要原始权重，维护者回复该 YOLOv5 使用深圳大学开源模型，团队自己也没有原始权重，随后关闭 issue。因此，仓库提供的是当前推理代码引用的模型文件，不是完整训练材料；原始检查点、训练配置和优化器状态都不在其中。迁移到其他推理框架时，应先确认目标框架能否导入现有推理产物，或者回到许可条件明确的上游取得可转换模型。本章没有在项目指定的 OpenVINO 和目标硬件上运行这些文件，推理兼容性仍需实际构建验证。
 

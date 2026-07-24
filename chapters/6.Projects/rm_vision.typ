@@ -13,7 +13,17 @@ rm_vision 发布在 chenjunnn（Chen Jun）的个人账户下，README 将它定
 
 把它作为第一个阅读样本，理由很实际：模型集中定义，QoS、TF 和串口路径都能一路追到具体文件，正好适合练习从仓库入口走到运行链与关键算法。下面先固定版本和边界，后面再沿着这条路线往里读。
 
-先固定本章依据的版本。截至 2026 年 7 月核对时，七个仓库的 `main` 分支分别是：`rm_vision` 的 `2ead8d0`（2024 年 11 月 8 日），`rm_auto_aim` 的 `f244d0e`（2023 年 5 月 19 日），MindVision 与 HikVision 驱动的 `7c0aab2`、`ebe1f1a`（均为 2023 年 5 月 17 日），`rm_gimbal_description` 与 `rm_serial_driver` 的 `0ccd8ce`、`794f4ec`（均为 2023 年 5 月 20 日），以及仿真器的 `e937f21`（2023 年 3 月 18 日）。这些短哈希不用背，它们只是保证后面的行号和结论都指向同一份代码。在本章固定的七个版本中，只有聚合仓库延续到 2024 年（当年删除了 README 中的推广信息）；其余六个仓库都停在 2023 年。长期未变化只说明阅读路径中的文件位置相对固定，不等于它们已经在近年的规则、硬件和依赖上得到验证。
+先固定本章依据的版本。截至 2026 年 7 月核对时，七个仓库的 `main` 分支分别指向：
+
+- `rm_vision`：`2ead8d0`，2024 年 11 月 8 日
+- `rm_auto_aim`：`f244d0e`，2023 年 5 月 19 日
+- MindVision 驱动：`7c0aab2`，2023 年 5 月 17 日
+- HikVision 驱动：`ebe1f1a`，2023 年 5 月 17 日
+- `rm_gimbal_description`：`0ccd8ce`，2023 年 5 月 20 日
+- `rm_serial_driver`：`794f4ec`，2023 年 5 月 20 日
+- 仿真器：`e937f21`，2023 年 3 月 18 日
+
+这些短哈希不用背，它们只是保证后面的行号和结论都指向同一份代码。在本章固定的七个版本中，只有聚合仓库延续到 2024 年（当年删除了 README 中的推广信息）；其余六个仓库都停在 2023 年。长期未变化只说明阅读路径中的文件位置相对固定，不等于它们已经在近年的规则、硬件和依赖上得到验证。
 
 `rm_auto_aim` 的 C++ 源文件和头文件合计 1948 行（不含测试）：识别部分 1067 行，跟踪部分 881 行。这个统计只描述所核对提交中的物理行数，不代表功能复杂度或代码质量；它说明的是主干规模可控，适合完整阅读，而不是只截取几个函数。
 
@@ -73,7 +83,9 @@ README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项
 === 数据流：默认硬件链与三条反向通道
 
 #block(breakable: false)[
-明确软件包边界后，接着检查默认硬件 launch 怎样连接节点。ROS 2 系统的主要运行关系可以归结为“谁发布什么、谁订阅什么、使用哪种 QoS”；下图汇总的是 `vision_bringup.launch.py` 装配的识别、跟踪和串口主流程，不包含需要另行启动的 Unity 仿真器。
+明确软件包边界后，接着检查默认硬件 launch 怎样连接节点。ROS 2 系统的主要运行关系可以归结为“谁发布什么、谁订阅什么、使用哪种 QoS”。
+
+这里先看 `vision_bringup.launch.py` 装配的识别、跟踪和串口主流程，下图不包含需要另行启动的 Unity 仿真器。
 
 #figure(
   image("images/proj-rmvision-dataflow.png", width: 100%),
@@ -81,7 +93,14 @@ README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项
 )
 ]
 
-主要前向数据链包含四个传递阶段：被选中的 HikVision 或 MindVision 相机节点 $arrow.r$ `/image_raw` $arrow.r$ 识别节点 $arrow.r$ `/detector/armors` $arrow.r$ 跟踪节点 $arrow.r$ `/tracker/target` $arrow.r$ 串口节点 $arrow.r$ 下位机。调试信息、marker 和 TF 等辅助话题不属于这条目标数据链，但仍会影响观测与排障。
+主要前向数据链包含四个传递阶段：
+
+- HikVision 或 MindVision 相机节点 → `/image_raw` → 识别节点
+- 识别节点 → `/detector/armors` → 跟踪节点
+- 跟踪节点 → `/tracker/target` → 串口节点
+- 串口节点 → 下位机
+
+调试信息、marker 和 TF 等辅助话题不属于这条目标数据链，但仍会影响观测与排障。
 
 识别节点对图像的订阅，以及识别结果和跟踪目标的相应端点使用 `SensorDataQoS`（例如 `detector_node.cpp:39,90`、`tracker_node.cpp:152`）：best-effort（尽力传输）、keep-last（只保留最近若干条），默认深度为 5。相机发布端却不能一概而论：在聚合仓库的组件路径中，HikVision 驱动默认采用传感器数据配置，MindVision 驱动默认采用普通的 reliable（可靠传输）配置，因为聚合仓库没有覆盖各自的 `use_sensor_data_qos`。后者仍可向请求 best-effort 的订阅端提供数据，但丢包与重传行为不再相同。`/tracker/info` 与 marker 等调试发布器按深度 10 创建，也采用默认 reliable 配置。这里展示的是逐端点核对 QoS，而不是从一个订阅者反推整条链路。
 
@@ -103,7 +122,16 @@ README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项
 
 两套相机节点都以 `rgb8` 发布 Image，并各自发布 CameraInfo，所以识别节点可以共用同一组话题。不过，两个消息的 header 并不完全一致：两套驱动都把 Image 的 `frame_id` 设为 `camera_optical_frame`；HikVision 会把完整 Image header 复制给 CameraInfo，MindVision 却只复制时间戳，固定 YAML 也没有填写 header，因此它发布的 CameraInfo `frame_id` 仍为空。依赖 CameraInfo 坐标系的标定与 TF 消费者需要先补齐并检查这一字段。
 
-接口对上了还不够，这里有个值得停下来看的缓冲区问题：两个驱动都只对 `image_msg_.data` 调用 `reserve()`，没有先 `resize()`。MindVision 随后让 SDK 写入尚不属于 vector 元素范围的 `data()`；HikVision 还把当时为 0 的 `size()` 当作输出缓冲区长度。两边都不检查转换结果，之后才 `resize()` 并发布。这个调用顺序违反了 C++ 容器的使用约定，应先修正再上机验证；至于现有 SDK 会把它表现成黑帧、旧帧还是其他故障，不能只靠读代码猜。
+接口对上了还不够，这里有个值得停下来看清的缓冲区问题。两个驱动都先执行同一项操作：
+
+`image_msg_.data.reserve(...)`
+
+它们都没有先调用 `resize()`，接下来的处理则略有不同：
+
+- MindVision 随后让 SDK 写入尚不属于 vector 元素范围的 `data()`。
+- HikVision 还把当时为 0 的 `size()` 当作输出缓冲区长度。
+
+两边都不检查转换结果，之后才 `resize()` 并发布。这个调用顺序违反了 C++ 容器的使用约定，应先修正再上机验证；至于现有 SDK 会把它表现成黑帧、旧帧还是其他故障，不能只靠读代码猜。
 
 标定信息也不是“有 YAML 就完成了”。HikVision 自带配置写 640×480，聚合仓库的覆盖配置写 1440×1080；驱动读取相机当前宽高，却不设置分辨率，也不检查 Image 与 CameraInfo 的尺寸是否一致。两份配置可以分别对应不同相机模式，但部署时必须以实际模式重新核对。MindVision 同样没有用实际帧尺寸验证所加载的内参。颜色通道、分辨率与内参至少应使用已知色块和标定板做端到端检查。
 
@@ -111,7 +139,15 @@ README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项
 
 === 仿真器：提供合成输入，但不在默认运行链
 
-进入算法前，再把仿真器放回运行链中看一眼。`rm_vision_simulator` 是 Unity 2021.3.11f1c1 工程，不是 ROS 2 ament 包。固定版本只有六个项目 C\# 脚本：它通过 Ros2ForUnity 发布 `/image_raw`、`/camera_info` 和 `/joint_states`；底盘由键盘直接改变刚体速度，云台由鼠标直接旋转 Transform，能量机关按固定转速和定时序列改变灯光。换句话说，它首先是一个合成图像源和可动场景，不是完整的车辆与下位机模拟器；代码没有订阅跟踪目标或云台命令，也没有串口、CAN、电机闭环和延迟模型。
+进入算法前，再把仿真器放回运行链中看一眼。
+
+`rm_vision_simulator` 是 Unity 2021.3.11f1c1 工程，不是 ROS 2 ament 包。固定版本只有六个项目 C\# 脚本，它通过 Ros2ForUnity 发布三个话题：
+
+- `/image_raw`
+- `/camera_info`
+- `/joint_states`
+
+底盘由键盘直接改变刚体速度，云台由鼠标直接旋转 Transform，能量机关按固定转速和定时序列改变灯光。换句话说，它首先是一个合成图像源和可动场景，不是完整的车辆与下位机模拟器；代码没有订阅跟踪目标或云台命令，也没有串口、CAN、电机闭环和延迟模型。
 
 它发布的 CameraInfo 也不能直接当作定量 PnP 的可靠内参。脚本用竖直视场角和图像宽度计算 `fx`，公式还额外乘了一次视场角，并简单令 `fy=fx`；消息没有填写 `width`、`height`、`R` 和 `P`。识别节点收到第一条 CameraInfo 后就固定使用其中的 `K`、`D` 创建 PnP 求解器，因此在把内参与 Unity 投影矩阵逐项对齐之前，仿真中的位姿尺度和轨迹只能用于流程调试，不能当作几何精度结果。
 
@@ -171,7 +207,13 @@ light.color = sum_r > sum_b ? RED : BLUE;
 
 这段实现遍历包围盒中的每个像素，并对每个点调用 `cv::pointPolygonTest`。若轮廓有 $N$ 个顶点、包围盒含 $A$ 个像素，判色部分的上界可写成 $O(A N)$；候选多或轮廓大时，它可能成为热点，但是否主导整帧耗时必须通过性能分析确认。可以比较两种替代实现：先用 `cv::drawContours` 生成掩膜再做通道求和，或在验证误判率后使用矩形近似。前者减少重复的点内判定，后者更快但可能混入背景和相邻灯条。应同时测耗时与判色准确率，而不是只凭复杂度决定替换。
 
-这里 `[0]` 表示 R、`[2]` 表示 B，因为节点入口使用 `cv_bridge::toCvShare(img_msg, "rgb8")`（`detector_node.cpp:205`），而不是 OpenCV 常见的 BGR 排列。通道语义由消息编码和转换请求共同决定；修改相机驱动或 `cv_bridge` 调用后，应使用已知颜色图像做端到端检查，不能只看 `cv::Mat` 的类型。
+这里要先确认通道顺序。节点入口执行的是下面这次转换：
+
+```cpp
+cv_bridge::toCvShare(img_msg, "rgb8")  // detector_node.cpp:205
+```
+
+因此，转换后 `[0]` 表示 R、`[2]` 表示 B，而不是 OpenCV 常见的 BGR 排列。通道语义由消息编码和转换请求共同决定；修改相机驱动或 `cv_bridge` 调用后，应使用已知颜色图像做端到端检查，不能只看 `cv::Mat` 的类型。
 
 第③级的 `containLight`（`detector.cpp:144-161`）用两根候选灯条的端点建立轴对齐包围盒；若第三根候选灯条的顶部、底部或中心落入盒内，就拒绝这一对。它主要抑制同一车辆多根灯条之间的跨越配对，代价是每个候选对再扫描一次灯条集合。该规则也可能因邻车灯条、反光或包围盒重叠而拒绝真装甲板，因此属于需要用场景数据验证的几何启发式，不是必然成立的物理约束。
 
@@ -181,10 +223,13 @@ light.color = sum_r > sum_b ? RED : BLUE;
 
 === 模型集中处：`tracker_node.cpp` 第 26 至 113 行
 
-这 88 行集中定义了状态转移、观测函数、两个雅可比以及 $bold(Q)$、$bold(R)$ 的更新方式。`ExtendedKalmanFilter` 类本身由 74 行头文件和 51 行实现组成，不引用 `Armor` 等业务类型；构造函数通过六个 `std::function` 接收运行中需要调用的模型函数，再直接接收只用于初始化的协方差 $bold(P)_0$。实现以 `P0.rows()` 确定状态维数，之后按注入的函数执行预测和更新。
+这 88 行集中定义了状态转移、观测函数、两个雅可比以及 $bold(Q)$、$bold(R)$ 的更新方式。
+
+`ExtendedKalmanFilter` 类本身由 74 行头文件和 51 行实现组成，不引用 `Armor` 等业务类型；构造函数通过六个 `std::function` 接收运行中需要调用的模型函数，再直接接收只用于初始化的协方差 $bold(P)_0$。实现以 `P0.rows()` 确定状态维数，之后按注入的函数执行预测和更新。
 
 这种结构将滤波递推与业务模型分开，便于替换模型和单独测试。不过，接口解耦不等于实现已经具备完整数值保护：该类仍显式求逆，并使用简化协方差更新，后文的复用建议会补充这些边界。
 
+#block(breakable: false)[
 ==== 过程函数与它的雅可比
 
 ```cpp
@@ -201,6 +246,7 @@ auto f = [this](const Eigen::VectorXd & x) {
   return x_new;
 };
 ```
+]
 
 开头三行注释给出状态、观测和命名约定：`xa` 表示装甲板位置，`xc` 表示车体中心位置；九维状态按“位置、速度”成对交错排列，观测为四维。这也是应用篇九维整车模型所参照的具体实现。
 
@@ -231,6 +277,7 @@ $ x_a = x_c - r cos theta, quad y_a = y_c - r sin theta $
 
 后两行直接取装甲板高度和朝向。车体中心、线速度和角速度不在单帧观测向量中，只能借助时间序列与模型耦合间接估计。是否可观以及估计精度如何，还取决于目标运动、可见装甲板切换、噪声和初值；写出状态并不自动保证每一维都能稳定辨识。
 
+#block(breakable: false)[
 雅可比适合逐项核对（`:65-76`）：
 
 ```cpp
@@ -242,6 +289,7 @@ h <<  1,   0,   0,   0,   0,   0,   r*sin(yaw), 0,   -cos(yaw),
       0,   0,   0,   0,   1,   0,   0,          0,   0,
       0,   0,   0,   0,   0,   0,   1,          0,   0;
 ```
+]
 
 第一行满足 $partial x_a \/ partial x_c = 1$、$partial x_a \/ partial theta = r sin theta$、$partial x_a \/ partial r = -cos theta$，分别位于第 0、6、8 列。第二行对应 $partial y_a \/ partial y_c = 1$、$partial y_a \/ partial theta = -r cos theta$、$partial y_a \/ partial r = -sin theta$；后两行是恒等映射。当前矩阵与上述函数一致。
 
@@ -379,9 +427,35 @@ same?     yes    NO     NO     NO     NO     NO     NO     yes    yes
 
 九个位置中只有 0、7、8 的语义一致，其余六个不同。例如 README 中 `x(1)` 是 $y_c$，代码中却是 $v_(x c)$；两者维数相同，因此访问不会越界。只抽查碰巧一致的 `x(0)` 或 `x(8)` 也无法发现问题。状态向量应有唯一的类型或索引定义，日志和消息转换最好引用同一组常量，并用已知状态测试每个分量，而不是在多个文件中重复手写顺序。
 
-第三处差异是参数名称和单位。README `:22-23` 写 `tracking_threshold`、`lost_threshold`；代码声明的是 `tracker.tracking_thres` 与 `tracker.lost_time_thres`。后者单位为秒，运行时再以 `lost_time_thres / dt_` 得到帧数门限（`tracker_node.cpp:223`）。README 还没有列出 `max_match_yaw_diff`。把旧名称写入参数文件不会配置当前成员；具体是忽略、警告还是拒绝，取决于 ROS 2 版本、NodeOptions 和启动方式，因此部署检查应读取节点最终声明与实际取值。
+第三处差异是参数名称和单位。README `:22-23` 与当前代码的名称对照如下：
 
-`rm_auto_aim` 根 README 的构建和测试命令使用 `--packages-up-to auto_aim_bringup`，包列表也写了这个名称；当前仓库实际包含 `armor_detector`、`armor_tracker`、`auto_aim_interfaces` 和 `rm_auto_aim`，没有 `auto_aim_bringup`。在所核对版本中，照抄该选择器无法得到目标包。
+```text
+README:       tracking_threshold, lost_threshold
+当前代码:     tracker.tracking_thres, tracker.lost_time_thres
+```
+
+当前代码中的后一个参数以秒为单位，运行时再换算成帧数门限：
+
+```cpp
+lost_time_thres / dt_  // tracker_node.cpp:223
+```
+
+README 还没有列出 `max_match_yaw_diff`。把旧名称写入参数文件不会配置当前成员；具体是忽略、警告还是拒绝，取决于 ROS 2 版本、NodeOptions 和启动方式，因此部署检查应读取节点最终声明与实际取值。
+
+`rm_auto_aim` 根 README 的构建和测试命令使用下面的包选择器，包列表也写了同一个名称：
+
+```text
+--packages-up-to auto_aim_bringup
+```
+
+当前仓库实际包含四个包：
+
+- `armor_detector`
+- `armor_tracker`
+- `auto_aim_interfaces`
+- `rm_auto_aim`
+
+其中没有 `auto_aim_bringup`。在所核对版本中，照抄 README 的选择器无法得到目标包。
 
 README `:27-28` 的几何式 $x_c = x_a + r cos theta$、$y_c = y_a + r sin theta$ 与当前观测函数仍然一致。也就是说，这份文档不是整体失效，而是不同段落与当前代码的一致程度不同。只凭发现一处错误而放弃全部文档，会丢失仍有用的设计意图；只凭一处正确而信任所有数值，同样不可靠。
 
@@ -398,7 +472,7 @@ README 与代码位于不同文件，编译器不会自动检查两者一致。�
 如果准备把 rm_vision 当作新项目起点，先别急着换检测器或调滤波参数。下面四项会更早决定它能不能稳定跑起来：
 
 - *先锁定版本，再补构建说明*。除聚合仓库后来只改过 README 外，自动瞄准、两套相机、云台描述、串口和仿真器的固定 HEAD 都停在 2023 年 3 月至 5 月；主 README 的 Docker 部署与源码编译两节又以 `TBD` 结束。相关说明主要面向 Ubuntu 22.04、ROS 2 Humble，仿真器则要求 Windows ROS 2 Humble 与指定 Unity 版本。接手后应先固定一组已知提交，再在目标系统上重跑构建和硬件检查。
-- *把 Dockerfile 与包依赖对齐*。Dockerfile 对六个 ROS 仓库执行 `git clone --depth=1`，没有锁定提交；`rm_vision_bringup/package.xml` 又只声明 `rm_auto_aim` 与 `rm_serial_driver`，漏掉两套相机和云台描述，`rm_auto_aim` README 还引用了不存在的包名。当前镜像能找到这些组件，依赖的是 Dockerfile 手工克隆，而不是完整的包元数据。
+- *把 Dockerfile 与包依赖对齐*。`git clone --depth=1` 用于拉取六个 ROS 仓库，但没有锁定提交；`rm_vision_bringup/package.xml` 又只声明 `rm_auto_aim` 与 `rm_serial_driver`，漏掉两套相机和云台描述，`rm_auto_aim` README 还引用了不存在的包名。当前镜像能找到这些组件，依赖的是 Dockerfile 手工克隆，而不是完整的包元数据。
 - *逐仓库看测试到底覆盖什么*。`rm_auto_aim` 的 workflow 会构建并运行 `colcon test`，但分类器基准测试没有断言，节点测试只检查构造不崩溃，跟踪包只有 lint；MindVision workflow 明确跳过测试，HikVision 与仿真器也没有当前版本中的功能或硬件 CI。先把这些边界分清，再补相机取流、TF、跟踪和 Unity 联通测试。
 - *沿 TF 发布者核对频率*。launch 虽为 `robot_state_publisher` 设置 `publish_frequency: 1000.0`，当前相机关节却是 fixed，`odom` $arrow.r$ `gimbal_link` 则是 floating，并由串口节点另行广播。这个参数不会把动态云台 TF 变成 1 kHz；要看真实更新率，仍得找到对应变换的发布者和数据源。
 
