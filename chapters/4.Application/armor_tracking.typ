@@ -228,7 +228,7 @@ double q_w     = pow(t,2)   * s2q_yaw;
 
 二、*记录关联差值和门限事件*。参照实现发布 `position_diff` 与 `yaw_diff`，它们正是正常匹配门使用的两个量。可以统计其分布、接近门限的比例、`handleArmorJump` 触发率以及进入 `TEMP_LOST` 的持续时间。频繁接近门限说明预测与观测不一致，可能来自远距离或灯条受损时的位姿波动，也可能来自同号候选错配；这些量能定位异常发生在关联阶段，但不能单独区分具体原因。
 
-三、*在定义正确的前提下使用 NIS*。标准归一化新息平方使用更新前的新息 $bold(nu) = bold(z) - bold(h)(hat(bold(x))^-)$ 与新息协方差 $bold(S) = bold(H) bold(P)^- bold(H)^top + bold(R)$：
+三、*在定义正确的前提下使用归一化新息平方（Normalized Innovation Squared，NIS）*。标准定义使用更新前的新息 $bold(nu) = bold(z) - bold(h)(hat(bold(x))^-)$ 与新息协方差 $bold(S) = bold(H) bold(P)^- bold(H)^top + bold(R)$：
 
 $ "NIS" = bold(nu)^top bold(S)^(-1) bold(nu) $
 
