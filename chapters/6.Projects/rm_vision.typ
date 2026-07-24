@@ -19,9 +19,9 @@ rm_vision 发布在 chenjunnn（Chen Jun）的个人账户下，README 将它定
 
 === 仓库与软件包边界
 
+#block(breakable: false)[
 读陌生工程时，先区分仓库、ROS 软件包和可执行节点。`rm_vision` 自身主要包含 `rm_vision_bringup` 包及其 launch、参数文件，算法、硬件接口和仿真环境位于 README 链接的独立仓库。七个仓库的边界如下：
 
-#[
 #show table: set text(size: 9pt)
 #figure(
   table(
@@ -72,12 +72,14 @@ README、Dockerfile 与 launch 回答的是三个不同问题：README 说明项
 
 === 数据流：默认硬件链与三条反向通道
 
+#block(breakable: false)[
 明确软件包边界后，接着检查默认硬件 launch 怎样连接节点。ROS 2 系统的主要运行关系可以归结为“谁发布什么、谁订阅什么、使用哪种 QoS”；下图汇总的是 `vision_bringup.launch.py` 装配的识别、跟踪和串口主流程，不包含需要另行启动的 Unity 仿真器。
 
 #figure(
   image("images/proj-rmvision-dataflow.png", width: 100%),
   caption: [rm_vision 默认硬件链的节点接线图（脚本 `proj_rmvision_dataflow.py`）。绿色部分表示 launch 选中的相机组件与识别节点处于同一容器，并启用 ROS 2 进程内通信；这会绕开 DDS 序列化，但实际复制次数仍取决于发布方式和消息所有权。STM32 回传的 `ReceivePacket` 是姿态、敌方颜色、复位位和瞄准点的来源，串口节点再据此发布 TF、回写参数、调用服务并显示 marker。],
 )
+]
 
 主要前向数据链包含四个传递阶段：被选中的 HikVision 或 MindVision 相机节点 $arrow.r$ `/image_raw` $arrow.r$ 识别节点 $arrow.r$ `/detector/armors` $arrow.r$ 跟踪节点 $arrow.r$ `/tracker/target` $arrow.r$ 串口节点 $arrow.r$ 下位机。调试信息、marker 和 TF 等辅助话题不属于这条目标数据链，但仍会影响观测与排障。
 
