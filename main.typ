@@ -2,7 +2,7 @@
 
 #show: ilm.with(
   title: [RoboMaster \ 视觉从入门到入土],
-  author: "Misaka21",
+  author: "Neomelt",
   date: datetime(year: 2025, month: 06, day: 25),
   abstract: [
     面向 RoboMaster 视觉组新队员的教程，内容涵盖开发基础、算法原理、系统实现、调试验证与开源项目阅读。
