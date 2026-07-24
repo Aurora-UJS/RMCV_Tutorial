@@ -49,7 +49,7 @@ RECORDED_RESULTS = [
     {"label": "-O3 -march=native -flto", "med": [0.05, 0.18, 0.17], "total_med": 0.40, "total_p99": 0.42},
 ]
 RECORDED_ENV = (
-    "i7-13790F | g++ 13.3.0 | 1440x1080 | CPU 2 | "
+    "i7-13790F | g++ 13.3.0 | 1440x1080 | logical CPU 2 | "
     "20 warm-ups + 300 measured iterations"
 )
 
