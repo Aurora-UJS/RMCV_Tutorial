@@ -5200,8 +5200,8 @@ include(CMakeFindDependencyMacro)
 # 公共接口引用 Eigen3::Eigen，必须先恢复该目标
 find_dependency(Eigen3 CONFIG)
 
-# rm_core 是共享库且公共接口不引用 OpenCV；OpenCV 不出现在 CMake
-# 链接接口中。它仍是运行时依赖，要由安装环境或系统包声明提供。
+# rm_core 是共享库且公共接口不引用 OpenCV；OpenCV 不进入导出的 CMake
+# 使用接口。部署时还要检查 librm_core.so 实际记录了哪些动态库依赖。
 
 # 包含导出的目标
 include("${CMAKE_CURRENT_LIST_DIR}/RMCoreTargets.cmake")
@@ -7312,8 +7312,9 @@ include("${CMAKE_CURRENT_LIST_DIR}/MyProjectTargets.cmake")
 check_required_components(MyProject)
 ```
 
-这里的 OpenCV、fmt 和 CUDA 都是共享库实现依赖，没有进入导出的 CMake 接口，但仍要由运行环境或系统包提供相应共享库。`SameMajorVersion` 与 `SOVERSION` 代表兼容承诺，不应在没有跨版本测试时机械照搬。
+这里把 OpenCV、fmt，以及启用 `MYPROJECT_ENABLE_CUDA` 时的 CUDA 都声明为 `PRIVATE` 实现依赖，因此它们没有进入 `mylib` 导出的 CMake 使用接口。不过，`PRIVATE` 只说明依赖不向下游目标公开，不能据此断定最终一定动态链接：实际结果还取决于这些包提供的目标、库类型和当前构建配置。部署前应检查生成库记录的动态依赖；确实被动态链接的 `.so`，才需要由运行环境或系统包一并提供。`SameMajorVersion` 与 `SOVERSION` 代表兼容承诺，不应在没有跨版本测试时机械照搬。
 
+#block(breakable: false)[
 *测试*：
 
 ```cmake
@@ -7333,6 +7334,7 @@ if(BUILD_TESTING)
     gtest_discover_tests(mylib_test)
 endif()
 ```
+]
 
 配置完成后还要实际运行 `ctest --test-dir build --output-on-failure`；测试目标存在或成功编译不等于测试已经执行。
 
