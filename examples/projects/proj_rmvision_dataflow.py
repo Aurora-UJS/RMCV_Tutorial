@@ -1,9 +1,8 @@
 # rm_vision ROS 2 wiring diagram for the project-analysis chapter.
-# Topic names, message types, QoS profiles and packet fields come from the four
-# reviewed repositories (rm_vision / rm_auto_aim / rm_serial_driver /
-# rm_gimbal_description). The figure emphasizes the process boundary: camera_node and armor_detector
-# are ComposableNodes inside one component_container with use_intra_process_comms;
-# everything downstream crosses DDS.
+# This figure shows the default hardware launch, not every repository linked by
+# the umbrella README. The selected camera and armor_detector are ComposableNodes
+# inside one component_container with use_intra_process_comms; everything
+# downstream crosses DDS. The Unity simulator is an external, manual input path.
 # Generates chapters/6.Projects/images/proj-rmvision-dataflow.png
 from pathlib import Path
 
@@ -45,7 +44,7 @@ def node(x, w, title, sub, fc, ec, tcol="white"):
             fontsize=7.5, color=tcol, zorder=4, linespacing=1.3)
 
 
-node(4.5, 18.0, "camera_node", "hik / mindvision\nseparate repo", GRAY, GRAY)
+node(4.5, 18.0, "camera_node", "Hik or MindVision\nselected at launch", GRAY, GRAY)
 node(29.0, 18.0, "armor_detector", "detector.cpp 245 L\ndetector_node.cpp 292 L", BLUE, BLUE)
 node(56.5, 19.0, "armor_tracker", "tracker.cpp 239 L\ntracker_node.cpp 350 L", BLUE, BLUE)
 node(85.0, 19.0, "rm_serial_driver", "Apache-2.0\nrm_serial_driver.cpp", MAGENTA, MAGENTA)
@@ -68,7 +67,7 @@ def label(xc, y, txt, col, fs=7.8):
 edge(22.5, 29.0, YM, GREEN, 3.6)
 label(20.0, YLAB,
       "/image_raw + /camera_info\nsensor_msgs/Image + sensor_msgs/CameraInfo\n"
-      "SensorDataQoS . intra-process; no DDS serialization",
+      "Hik: sensor-data QoS . MV: default reliable\nintra-process within container",
       GREEN)
 ax.plot([25.7, 25.7], [YLAB - 4.2, YM + 1.4], lw=0.9, color=GREEN, ls=(0, (2, 2)), zorder=2)
 
@@ -83,6 +82,17 @@ ax.plot([81.5, 81.5], [YLAB - 4.2, YM + 1.4], lw=0.9, color=BLUE, ls=(0, (2, 2))
 edge(104.0, 112.0, YM, MAGENTA, 2.2)
 label(110.5, YLAB, "SendPacket: 48 B under reviewed ABI\n0xA5 + whole-car state + CRC16\nUART budget: 83% at 200 Hz if 115200 8N1", MAGENTA)
 ax.plot([110.5, 110.5], [YLAB - 4.2, YM + 1.4], lw=0.9, color=MAGENTA, ls=(0, (2, 2)), zorder=2)
+
+# The MCU reply is the source of the pose, color, reset, and aim-marker branches.
+YRX = YB - 5.0
+ax.plot([117.75, 117.75], [YB - 0.6, YRX], lw=1.8, color=MAGENTA, zorder=5)
+ax.plot([117.75, 101.0], [YRX, YRX], lw=1.8, color=MAGENTA, zorder=5)
+ax.add_patch(FancyArrowPatch((101.0, YRX), (101.0, YB - 0.6), arrowstyle="-|>",
+                             mutation_scale=13, linewidth=1.8, color=MAGENTA,
+                             shrinkA=0, shrinkB=0, zorder=5))
+label(110.0, YRX - 3.0,
+      "ReceivePacket: 28 B under reviewed ABI\npose + color + reset + aim marker",
+      MAGENTA, fs=6.8)
 
 # ---- reverse channel 1: params + service -----------------------------------
 YR = YB - 16.0
@@ -119,11 +129,11 @@ ax.text(25.0, YT - 7.7,
 
 # ---- header ----------------------------------------------------------------
 ax.text(63.0, 79.5,
-        "rm_vision wiring: four reviewed repositories, seven ament packages",
+        "rm_vision hardware wiring: Hik or MindVision feeds the same pipeline",
         ha="center", va="center", fontsize=12.6, fontweight="bold", color=INK)
 ax.text(63.0, 74.8,
         "Green marks the shared component container; downstream nodes communicate across process boundaries.\n"
-        "The serial node sends target state and also supplies TF, a color parameter, and the tracker-reset service.",
+        "The serial node sends target state; the MCU reply supplies TF, color, reset, and aim-marker data.",
         ha="center", va="center", fontsize=8.8, color=INK, linespacing=1.5)
 
 output = (Path(__file__).resolve().parents[2]
