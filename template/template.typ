@@ -122,6 +122,10 @@
   // Set the body font.
   set text(size: 11pt) // default is 11pt
 
+  // Keep language names such as C++, C++20, and C/C++ together. Typst may
+  // otherwise break at a plus sign when the label lands at the line boundary.
+  show regex("(?:C/)?C\\+\\+(?:[0-9]+)?"): it => box(it)
+
   // Set raw text font.
   // Fallback chain ends in fonts that are always available (DejaVu Sans Mono is
   // embedded in the Typst binary), so code never degrades to a serif font when
@@ -134,14 +138,13 @@
     "Noto Sans Mono CJK SC",
   ))
 
-  // Display inline code in a small box that retains the correct baseline.
-  // Raw text defaults to 0.8em; 1.15em on top of that yields ~0.92em of body size,
-  // so inline code is not dwarfed by the surrounding 11pt CJK text.
-  show raw.where(block: false): it => box(
+  // Highlight inline code without boxing the whole span, so long snippets can
+  // wrap at spaces instead of forcing justified Chinese text far apart.
+  // Raw text defaults to 0.8em; 1.15em on top of that yields ~0.92em of body size.
+  show raw.where(block: false): it => highlight(
     fill: fill-color.darken(2%),
-    inset: (x: 3pt, y: 0pt),
-    outset: (y: 3pt),
     radius: 2pt,
+    extent: 2pt,
     text(size: 1.15em, it),
   )
 
@@ -261,6 +264,10 @@
         } else {
           align(aln)[#i #h(gap) #chapter]
         }
+      } else {
+        // Unnumbered index headings do not have a chapter label, but their
+        // continuation pages should still retain the page number.
+        align(aln)[#i]
       }
     }
   })
