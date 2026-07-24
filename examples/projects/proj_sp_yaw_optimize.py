@@ -16,6 +16,8 @@
 # local minimum and raises the chance of a large yaw error under corner noise.
 #
 # Generates chapters/6.Projects/images/proj-sp-yaw-optimize.png
+from pathlib import Path
+
 import cv2
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -55,8 +57,9 @@ PIX_NOISE = 1.0             # px, 1-sigma per corner coordinate
 TRIALS = 600
 YAW_TRUE = 25 * DEG
 
-# Chosen synthetic pose: 4 m away, 12 deg off the optical axis, 0.25 m above
-# the gimbal, with the gimbal yawed by 10 deg.
+# Chosen synthetic pose: 4 m horizontal range at world-frame azimuth 12 deg,
+# 0.25 m above the gimbal origin, with the gimbal yawed by 10 deg. Before the
+# camera extrinsics are applied, the target is therefore 2 deg off gimbal yaw.
 DIST_M, AZIM, HEIGHT, GIMBAL_YAW = 4.0, 12 * DEG, 0.25, 10 * DEG
 XYZ = np.array([DIST_M * np.cos(AZIM), DIST_M * np.sin(AZIM), HEIGHT])
 R_G2W = np.array([[np.cos(GIMBAL_YAW), -np.sin(GIMBAL_YAW), 0],
@@ -174,9 +177,10 @@ axB.legend(h1 + h2, l1 + l2, fontsize=8.4, loc="upper left", framealpha=0.95)
 axB.grid(alpha=0.25, lw=0.6)
 
 fig.tight_layout()
-out = "chapters/6.Projects/images/proj-sp-yaw-optimize.png"
+repo_root = Path(__file__).resolve().parents[2]
+out = repo_root / "chapters/6.Projects/images/proj-sp-yaw-optimize.png"
 fig.savefig(out, dpi=150, bbox_inches="tight")
-print("wrote", out)
+print("wrote", out.relative_to(repo_root))
 
 # --- numbers quoted in the prose -----------------------------------------
 print("\npitch_true  large-err%%   RMS err [deg]   (noise %.1f px, %d trials)"
