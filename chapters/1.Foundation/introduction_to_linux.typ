@@ -111,7 +111,13 @@ ROS 常用工具包括 ROS 1 的 catkin、roslaunch，以及 ROS 2 常用的 col
 
 以 OpenCV 为例，在 Ubuntu 上可以通过包管理器安装发行版提供的版本，也可以从源码编译并选择 CUDA、OpenCL、TBB 等功能。Windows 同样可以使用预编译包、源码构建或 vcpkg 等工具，但编译器版本、路径和运行时库的配置方式与 Linux 不同。队伍统一平台和安装方法，可以减少成员之间的环境差异。
 
-Linux 的包管理系统也便于集中管理依赖。`apt install libopencv-dev` 会安装 Ubuntu 仓库中的 OpenCV 开发包及其声明的依赖；在 ROS 2 中，`rosdep install` 可以根据软件包清单解析系统依赖。它们不能解决所有第三方版本和源码依赖问题，但能覆盖许多常见配置。
+Linux 的包管理系统也便于集中管理依赖。例如，下面这条命令会安装 Ubuntu 仓库中的 OpenCV 开发包及其声明的依赖：
+
+```bash
+sudo apt install libopencv-dev
+```
+
+在 ROS 2 中，`rosdep install` 可以根据软件包清单解析系统依赖。两种工具都不能解决所有第三方版本和源码依赖问题，但能覆盖许多常见配置。
 
 ==== 实时性与系统控制
 
@@ -288,7 +294,21 @@ Unix/Linux 常用“一切皆文件”（Everything is a file）概括一种接�
 
 从 Windows 转向 Linux 时，有一些常见的困惑和问题。了解这些可以帮助你更快地适应。
 
-“软件去哪里安装了？” 这是新手常问的问题。在 Windows 上，程序常见于 `C:\Program Files` 或 `C:\Program Files (x86)`。在 Linux 上，通过包管理器安装的文件通常按用途分布：可执行文件可能在 `/usr/bin`，库在 `/usr/lib`，系统级配置在 `/etc`，文档在 `/usr/share/doc`。日常运行时通常只需知道命令名；排查路径、配置或卸载问题时，可以用 `command -v` 查找命令，用 `dpkg -L 软件包名` 查看某个 deb 包安装的文件。
+“软件去哪里安装了？” 这是新手常问的问题。在 Windows 上，程序常见于下面两个目录：
+
+- `C:\Program Files`
+- `C:\Program Files (x86)`
+
+Linux 通常不把一个软件的所有文件集中到单个目录中。通过包管理器安装后，文件会按用途分布：可执行文件可能在 `/usr/bin`，库在 `/usr/lib`，系统级配置在 `/etc`，文档在 `/usr/share/doc`。
+
+日常运行时通常只需知道命令名。需要排查路径、配置或卸载问题时，可以分别使用下面两条命令：
+
+```bash
+command -v 命令名
+dpkg -L 软件包名
+```
+
+前一条查找命令的位置，后一条列出某个 deb 包安装的文件。
 
 “怎么运行程序？” 图形应用可以从桌面菜单启动；命令位于 `PATH` 中时，直接在终端输入名称即可。当前目录通常不在 `PATH` 中，所以运行其中的程序要写出路径，如 `./my_program`，这也避免 Shell 默认优先执行当前目录下的同名文件。程序还需要适合当前系统的格式和执行权限；对于可信的自有脚本，可以用 `chmod u+x script.sh` 给所有者添加权限，并确认解释器行正确。
 

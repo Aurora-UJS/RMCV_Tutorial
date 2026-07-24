@@ -885,7 +885,13 @@ alias ll='ls -alF'
 alias gs='git status'
 ```
 
-修改 `.bashrc` 后，可以打开新终端验证；也可以先检查语法和内容，再用 `source ~/.bashrc` 在当前 Bash 中执行。`source` 会运行文件里的所有命令，不应对来源不明的配置文件直接使用。
+修改 `.bashrc` 后，可以打开新终端验证。确认语法和内容后，也可以在当前 Bash 中执行：
+
+```bash
+source ~/.bashrc
+```
+
+`source` 会运行文件里的所有命令，不应对来源不明的配置文件直接使用。
 
 `~/.bash_history` 通常保存 Bash 写入磁盘的部分命令历史。是否记录、何时写入、忽略哪些命令以及保留多少条都可以配置；当前会话用上箭头看到的记录还不一定已经写进文件。
 
@@ -1685,7 +1691,13 @@ tar tf opencv-4.8.0.tar.gz | less
 tar czf rm_vision_backup_$(date +%Y%m%d).tar.gz rm_vision/
 ```
 
-最后一个命令使用命令替换 `$(date +%Y%m%d)` 生成日期，如 `rm_vision_backup_20240115.tar.gz`。文件名相同会被覆盖，日期也不区分同一天内的多次备份；实际备份应写到独立目标，加入时间或唯一编号，检查 `tar` 的退出状态，并至少做一次清单或恢复演练。归档存在不等于备份已经可恢复。
+最后一个命令使用命令替换 `$(date +%Y%m%d)` 生成日期。例如，2024 年 1 月 15 日会得到下面的文件名：
+
+```text
+rm_vision_backup_20240115.tar.gz
+```
+
+文件名相同会被覆盖，日期也不区分同一天内的多次备份；实际备份应写到独立目标，加入时间或唯一编号，检查 `tar` 的退出状态，并至少做一次清单或恢复演练。归档存在不等于备份已经可恢复。
 
 本节把路径定位、查看、创建、复制、删除、查找和归档连成了一套基本流程。无需一次记住全部选项，但要优先记住三件事：修改前确认当前目录和展开后的目标，遇到覆盖与递归操作先做只读预览，完成复制或备份后验证结果。下一节继续处理文件内容，重点是搜索、转换与比较文本，而不是再扩大文件操作范围。
 
@@ -3184,7 +3196,14 @@ software-properties-gtk
 sudo apt update
 ```
 
-服务器环境可按镜像方针对 Ubuntu 22.04 的说明使用 `sudoedit` 修改对应 `.list`/`.sources` 文件，但不要把另一个 Ubuntu 版本的完整配置覆盖过来。保留原会话，确认 `apt update` 没有签名、Release 文件或套件错误后再继续。
+服务器环境应按镜像方针中针对 Ubuntu 22.04 的说明操作。需要编辑 APT 源文件时，可以使用 `sudoedit`；文件采用以下两种后缀之一：
+
+```text
+.list
+.sources
+```
+
+不要把另一个 Ubuntu 版本的完整配置覆盖过来。保留原会话，确认 `apt update` 没有签名、Release 文件或套件错误后再继续。
 
 *PPA：个人软件包存档*
 
@@ -4316,7 +4335,9 @@ wget --limit-rate=1M https://example.com/file.zip
 
 `-O` 会写入指定路径，已有文件可能被覆盖；`-c` 对错误的本地残片或已经变化的远端文件也可能产生无效结果。下载发布物时优先写入新名称，并用发布方独立提供的 SHA-256 或签名核验。递归抓取还要遵守站点条款、访问频率和存储范围。
 
-`curl` 功能更丰富，支持更多协议，常用于调用应用程序编程接口（application programming interface，API）和编写网络脚本：
+`curl` 支持的协议更多，功能也更丰富。它常用于调用 API 和编写网络脚本。
+
+API 是 application programming interface 的缩写，中文通常译作“应用程序编程接口”。下面先看几种常见用法：
 
 ```bash
 # 下载文件（默认输出到标准输出）
@@ -4501,7 +4522,12 @@ ssh robot    # 相当于 ssh alice@192.168.1.50
 ssh jetson   # 相当于 ssh nvidia@192.168.1.60 -i ~/.ssh/jetson_key
 ```
 
-`ServerAliveInterval` 让客户端在无服务器数据时发送 SSH 层探测，`ServerAliveCountMax` 控制连续无响应后断开。它能更快发现部分失效连接，也可能避开某些空闲超时，但不能保证网络不断或远程任务继续运行。
+这两个保活参数分工不同：
+
+- `ServerAliveInterval`：客户端在没有收到服务器数据时，隔多久发送一次 SSH 层探测。
+- `ServerAliveCountMax`：连续多少次探测没有响应后断开连接。
+
+它们能更快发现部分失效连接，也可能避开某些空闲超时，但不能保证网络不断或远程任务继续运行。
 
 *SSH 端口转发*
 
@@ -4860,7 +4886,14 @@ $HOME       # 环境中的用户主目录路径
 $PWD        # Shell 维护的逻辑工作目录
 ```
 
-变量展开通常写在双引号中，例如 `printf '%s\n' "$project"` 和 `command -- "$path"`。未加引号的展开会参与单词拆分与通配符匹配，文件名含空格、换行或 `*` 时就会改变参数数量。`$?` 也只保存最近一条命令的状态，若要稍后使用应立即赋给专用变量。
+变量展开通常写在双引号中。例如：
+
+```bash
+printf '%s\n' "$project"
+command -- "$path"
+```
+
+未加引号的展开会参与单词拆分与通配符匹配，文件名含空格、换行或 `*` 时就会改变参数数量。`$?` 也只保存最近一条命令的状态，若要稍后使用应立即赋给专用变量。
 
 *用户输入*
 
@@ -5804,7 +5837,14 @@ use_ros_ws() {
 
 `ROS_DOMAIN_ID` 应由队伍按网络规划设置；它用于 DDS 发现域隔离，不是访问控制或加密机制，因此示例不在所有终端中固定导出它。若需要显示 Git 分支，可使用发行版提供的 Git prompt 或其他提示符工具；这类命令会在每次刷新提示符时运行，在大型仓库或网络文件系统上可能增加延迟。
 
-修改后先执行 `bash -n "$HOME/.bashrc"` 检查语法，再用 `bash --noprofile --rcfile "$HOME/.bashrc" -i` 打开一个测试子 Shell。确认提示符、补全和函数都正常后再关闭旧终端。直接在当前会话中 `source ~/.bashrc` 会立即执行到出错位置，已有环境可能只更新了一部分，因此不适合作为唯一测试。
+修改后先检查语法，再打开一个只加载这份配置的测试子 Shell：
+
+```bash
+bash -n "$HOME/.bashrc"
+bash --noprofile --rcfile "$HOME/.bashrc" -i
+```
+
+确认提示符、补全和函数都正常后再关闭旧终端。直接在当前会话中加载 `.bashrc`，会一直运行到出错位置，已有环境可能只更新了一部分，因此不适合作为唯一测试。
 
 *别名与函数各自适合什么*
 
@@ -5989,7 +6029,20 @@ use_ros_ws() {
 }
 ```
 
-运行 `zsh -n "$HOME/.zshrc"` 可做语法检查；再启动 `zsh -f` 得到不加载用户配置的测试 Shell，并在其中手动 `source ~/.zshrc`。这能把试错限制在子 Shell 中。确认交互 Shell 稳定后，下一步可以用 tmux 组织多个长期终端，而不是继续把更多启动动作塞进配置文件。
+可以按下面的顺序检查 Zsh 配置：
+
+```zsh
+# 先做语法检查
+zsh -n "$HOME/.zshrc"
+
+# 再启动不加载用户配置的测试 Shell
+zsh -f
+
+# 进入测试 Shell 后手动加载配置
+source ~/.zshrc
+```
+
+这样能把试错限制在子 Shell 中。确认交互 Shell 稳定后，下一步可以用 tmux 组织多个长期终端，而不是继续把更多启动动作塞进配置文件。
 
 ==== tmux 终端复用
 
@@ -6208,7 +6261,13 @@ colcon build --symlink-install \
     --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 ```
 
-成功配置过的 CMake 包通常会在 `build/<package>/compile_commands.json` 生成编译数据库。以 `rm_vision` 为当前主要包时，可以在工作空间的 `.vscode/settings.json` 中显式指向它：
+成功配置过的 CMake 包通常会生成编译数据库，默认位置形如：
+
+```text
+build/<package>/compile_commands.json
+```
+
+以 `rm_vision` 为当前主要包时，可以在工作空间的 `.vscode/settings.json` 中显式指向它：
 
 ```json
 {
@@ -6235,7 +6294,15 @@ python3 -c 'import sys; print("\n".join(sys.path))'
 python3 -c 'import rclpy; print(rclpy.__file__)'
 ```
 
-若 Python 扩展仍找不到包，再把输出中确实存在的项目路径加入 `python.analysis.extraPaths`。不要预先给所有集成终端写死全局 `PYTHONPATH`：它可能把旧 overlay 放到系统包之前，使终端运行结果与 colcon/launch 的环境顺序不一致。索引配置只改善编辑器理解代码的能力，是否能构建仍要由下一节的 CMake/colcon 命令和项目测试确认。
+若 Python 扩展仍找不到包，可以在编辑器设置中找到：
+
+```text
+python.analysis.extraPaths
+```
+
+只把前面输出中确实存在的项目路径加入这个选项。它只影响编辑器怎样索引代码。
+
+不要预先给所有集成终端写死全局 `PYTHONPATH`：它可能把旧 overlay 放到系统包之前，使终端运行结果与 colcon/launch 的环境顺序不一致。索引配置能改善编辑器对代码的理解，但项目能否构建，仍要由下一节的 CMake/colcon 命令和项目测试确认。
 
 ==== CMake 项目构建流程
 
@@ -6269,7 +6336,16 @@ cmake --install "$build_dir"
 
 把源码和构建目录分开，便于并存 Debug、Release 等配置，也避免生成文件混进源码。`stage` 只是一份待检查的安装树，不会自动让系统或 ROS 找到它；确认内容、运行时搜索路径和卸载方案后，再决定项目应安装到工作空间、用户前缀、软件包还是系统前缀。不要把 `sudo make install` 当作默认步骤，因为它可能写入包管理器未跟踪的系统文件。
 
-`CMAKE_BUILD_TYPE` 适用于 Unix Makefiles、Ninja 这类单配置生成器。Visual Studio、Xcode 和 Ninja Multi-Config 等多配置生成器通常在构建和安装时使用 `--config RelWithDebInfo`，不能假设配置阶段的同名变量起效。`ctest` 退出 0 只说明当前构建树中被发现并执行的测试通过；若项目没有注册测试，它可能报告 “No tests were found”。
+`CMAKE_BUILD_TYPE` 适用于 Unix Makefiles、Ninja 这类单配置生成器。
+
+Visual Studio、Xcode 和 Ninja Multi-Config 等多配置生成器通常要在构建和安装时显式选择配置。例如：
+
+```bash
+cmake --build build --config RelWithDebInfo
+cmake --install build --config RelWithDebInfo
+```
+
+不能假设配置阶段的 `CMAKE_BUILD_TYPE` 会对这类生成器起效。另一个容易混淆的边界是：`ctest` 退出 0，只说明当前构建树中被发现并执行的测试通过；若项目没有注册测试，它可能报告 “No tests were found”。
 
 *常用 CMake 选项*
 
@@ -6434,7 +6510,17 @@ LD_LIBRARY_PATH="/verified/prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
     ./my_program
 ```
 
-这里要区分“库不存在”“库存在但搜索不到”“找到了错误版本”和“库的依赖又缺失”。`LD_LIBRARY_PATH` 的单次命令可验证搜索路径假设，但不适合全局写入 `.bashrc`。项目可根据实际安装布局设置受控的 install RPATH，也就是写进安装后二进制的运行库搜索路径；例如可执行文件位于 `bin`、私有库位于相邻 `lib` 时使用 `INSTALL_RPATH "$ORIGIN/../lib"`。系统级 `/etc/ld.so.conf.d` 和 `ldconfig` 应留给经过审查、可卸载的系统安装方案。对不可信二进制不要运行 `ldd`，可先用 `readelf` 做静态检查。
+这里要先区分四种情况：“库不存在”“库存在但搜索不到”“找到了错误版本”和“库的依赖又缺失”。上面的单次 `LD_LIBRARY_PATH` 命令可以验证搜索路径假设，但不适合全局写入 `.bashrc`。
+
+项目还可以根据实际安装布局设置受控的 install RPATH，也就是写进安装后二进制的运行库搜索路径。例如，可执行文件位于 `bin`、私有库位于相邻 `lib` 时，可以设置：
+
+```cmake
+set_target_properties(my_program PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../lib"
+)
+```
+
+系统级 `/etc/ld.so.conf.d` 和 `ldconfig` 应留给经过审查、可卸载的系统安装方案。对不可信二进制不要运行 `ldd`，可先用 `readelf` 做静态检查。
 
 *ROS 2 包找不到*
 
@@ -6480,7 +6566,13 @@ udevadm info --query=property --name="$serial_device" |
 [[ -r "$serial_device" && -w "$serial_device" ]]
 ```
 
-Ubuntu 上许多 USB 串口属于 `dialout`，但应以设备节点的实际组为准。确认该组只授予预期设备权限后，管理员可以用 `sudo usermod -aG dialout "$USER"` 添加成员；必须完整退出并重新登录，旧会话的组列表才会更新。不要用 `chmod 666` 把设备临时开放给所有本机用户，udev 还可能在重插后重置权限。固定硬件可依据核对过的 vendor/product/serial 编写最小权限 udev 规则；若权限位允许但仍打不开，还要检查设备是否消失、被其他进程占用，以及容器或沙箱是否传入了该设备。
+Ubuntu 上许多 USB 串口属于 `dialout`，但应以设备节点的实际组为准。确认该组只授予预期设备权限后，管理员可以把当前用户加入该组：
+
+```bash
+sudo usermod -aG dialout "$USER"
+```
+
+执行后必须完整退出并重新登录，旧会话的组列表才会更新。不要用 `chmod 666` 把设备临时开放给所有本机用户，udev 还可能在重插后重置权限。固定硬件可依据核对过的 vendor/product/serial 编写最小权限 udev 规则；若权限位允许但仍打不开，还要检查设备是否消失、被其他进程占用，以及容器或沙箱是否传入了该设备。
 
 *SSH 连接问题*
 
@@ -6562,6 +6654,20 @@ git submodule update --init --recursive
 git submodule foreach --recursive 'git status --short'
 ```
 
-子模块在超级项目中记录的是一个确切提交，不是“始终跟随最新版本”的目录。普通克隆后目录为空或未初始化时，`update --init --recursive` 会按这些记录检出；`git submodule update --remote <path>` 则会查询配置的远端分支并改变该子模块工作树，应只对明确路径有意执行，再审查超级项目中出现的 gitlink 变化。不要用 `deinit -f .` 处理一般更新问题，它会强制移除所有子模块工作树，未保存修改可能丢失。
+子模块在超级项目中记录的是一个确切提交，不是“始终跟随最新版本”的目录。普通克隆后目录为空或未初始化时，上面的初始化命令会按这些记录检出。
+
+如果确实要让某个子模块查询配置的远端分支，可以只对明确路径执行：
+
+```bash
+git submodule update --remote <path>
+```
+
+这条命令会改变该子模块工作树，执行后还要审查超级项目中出现的 gitlink 变化。一般更新问题不要用下面的强制反初始化命令处理：
+
+```bash
+git submodule deinit -f .
+```
+
+它会移除所有子模块工作树，未保存修改可能丢失。
 
 至此，一套开发环境应当满足三个可观察条件：新终端能说明自己加载了哪些环境，构建命令和产物目录可以复现，出现错误时还能找到原始日志与最小诊断路径。提示符、主题和快捷键可以按个人习惯调整；工具链版本、依赖来源、ROS overlay 顺序和设备权限则应写进团队文档并经过实际构建与硬件检查。每次只改一组相关配置并保留回退路径，比追求“一次配置完成”更容易维护。

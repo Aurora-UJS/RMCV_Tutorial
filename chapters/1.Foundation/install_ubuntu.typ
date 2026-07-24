@@ -28,7 +28,13 @@
 https://mirrors.tuna.tsinghua.edu.cn/ubuntu-releases/22.04/
 ```
 
-下载其中最新的 Ubuntu 22.04 Desktop amd64 镜像，例如 `ubuntu-22.04.5-desktop-amd64.iso`。小版本号和文件大小会随发布更新而变化，通常为数 GB；下载前应同时确认版本、`desktop`、`amd64` 和 `.iso` 后缀。
+下载其中最新的 Ubuntu 22.04 Desktop amd64 镜像。以下文件名是本书使用的版本示例：
+
+```text
+ubuntu-22.04.5-desktop-amd64.iso
+```
+
+小版本号和文件大小会随发布更新而变化，通常为数 GB；下载前应同时确认版本、`desktop`、`amd64` 和 `.iso` 后缀。
 
 下载完成后应进行校验（checksum verification）。镜像在下载或存储过程中损坏，可能在启动或安装阶段表现为读取错误。校验时计算文件的 SHA-256 哈希值，再与可信渠道发布的 `SHA256SUMS` 中对应条目比较；意外改动几乎必然会得到不同结果。哈希一致只说明本地文件与参考值对应，参考文件本身也要从 Ubuntu 官方站点或可信镜像通过 HTTPS 取得；需要进一步核对发布来源时，可以按 Ubuntu 的说明验证 `SHA256SUMS.gpg` 签名。
 
@@ -71,7 +77,13 @@ lsblk
 sudo dd if=ubuntu-22.04.5-desktop-amd64.iso of=/dev/sdb bs=4M status=progress conv=fsync
 ```
 
-*警告：`dd` 会直接覆盖 `of=` 指定的设备，不会询问它是不是系统盘。* 写错目标可能破坏分区表和文件数据，恢复通常困难且可能不完整。执行前应拔掉无关移动存储，再用 `lsblk -o NAME,SIZE,MODEL,TRAN,MOUNTPOINTS` 结合容量与型号确认整块 U 盘；任何一项不确定时都应停止，改用能够明确显示设备信息的图形工具并再次核对。
+*警告：`dd` 会直接覆盖 `of=` 指定的设备，不会询问它是不是系统盘。* 写错目标可能破坏分区表和文件数据，恢复通常困难且可能不完整。执行前应拔掉无关移动存储，再查看设备的名称、容量、型号、连接方式和挂载点：
+
+```bash
+lsblk -o NAME,SIZE,MODEL,TRAN,MOUNTPOINTS
+```
+
+结合这些信息确认整块 U 盘；任何一项不确定时都应停止，改用能够明确显示设备信息的图形工具并再次核对。
 
 ==== 备份数据与 Windows 侧准备
 
@@ -79,7 +91,9 @@ sudo dd if=ubuntu-22.04.5-desktop-amd64.iso of=/dev/sdb bs=4M status=progress co
 
 *备份是不可跳过的一步。* 双系统安装涉及压缩现有分区、写入新的引导程序，正常操作下 Windows 的数据不会受影响，但断电、误删分区或选错设备都可能造成损失。把课程资料、代码、照片等重要文件复制到与待操作磁盘独立的设备或可靠远程存储，并抽查文件能否恢复。远程 Git 仓库适合保存已经提交和推送的代码历史，但通常不包含未跟踪文件、未推送提交、数据集、密钥和某些 Git LFS 对象，因此它只是代码备份的一部分，不能代替完整备份。
 
-第二件事是处理 BitLocker。较新的 Windows 笔记本可能默认开启设备加密或 BitLocker，调整启动配置和固件设置后可能要求恢复密钥；没有密钥就可能无法继续启动 Windows。先在 Windows 中确认每个卷的保护状态，把恢复密钥保存到待操作电脑之外并实际核对。通常可以按当前 Windows 与设备厂商的说明暂时挂起保护，完成安装并验证 Windows 启动后再恢复；是否需要完整解密取决于组织策略和具体操作，不应只凭通用教程决定。
+第二件事是处理磁盘加密。较新的 Windows 笔记本可能默认开启“设备加密”或 BitLocker。
+
+调整启动配置和固件设置后，系统可能要求恢复密钥；没有密钥就可能无法继续启动 Windows。先在 Windows 中确认每个卷的保护状态，把恢复密钥保存到待操作电脑之外并实际核对。通常可以按当前 Windows 与设备厂商的说明暂时挂起保护，完成安装并验证 Windows 启动后再恢复；是否需要完整解密取决于组织策略和具体操作，不应只凭通用教程决定。
 
 第三件事是关闭 Windows 的“快速启动”（Fast Startup）。启用后，Windows 关机时会结束用户会话，但把内核会话和驱动状态写入休眠文件，以便下次更快启动；这属于混合关机，不等同于完整休眠，也不是简单地“没有关机”。如果 Ubuntu 写入仍带有休眠状态的 NTFS 卷，可能造成文件系统不一致，因此 Linux 通常会拒绝读写挂载或只读处理。在“控制面板 → 电源选项 → 选择电源按钮的功能”中取消勾选“启用快速启动”，并在分区操作前执行一次完整关机。
 
@@ -105,7 +119,13 @@ BIOS/UEFI 是主板上的固件（firmware），负责在操作系统接管之�
 
 插上启动盘，开机时按上一节记下的启动菜单快捷键，在设备列表中选择 U 盘。同一设备可能同时出现 UEFI 与 Legacy 条目；在本节已经确认 Windows 使用 UEFI/GPT 的前提下，选择带 UEFI 标识的条目，并在 Live 环境中再次确认启动模式。不要只凭品牌名称选择另一个同容量磁盘。如果使用 Ventoy，接下来会出现 Ventoy 菜单，选中实际下载的 Ubuntu 22.04 amd64 ISO，以普通模式（Boot in normal mode）启动；随后在 GRUB 菜单选择“Try or Install Ubuntu”。
 
-正常启动后会进入 Ubuntu Live 环境。系统主要从 U 盘加载，此时尚未开始安装；但 Live 系统仍能识别和挂载磁盘，因此不要主动执行分区或写盘操作。打开终端运行 `test -d /sys/firmware/efi && echo UEFI || echo Legacy`，在本节方案中应输出 `UEFI`；若不是，应返回启动菜单重新核对，而不是继续创建 EFI 分区。随后连接 Wi-Fi，检查网卡、触摸板和屏幕分辨率是否正常。关键硬件在 Live 环境中无法使用时，安装后的默认驱动也可能存在相同问题，可以先记录硬件型号并查询支持情况。
+正常启动后会进入 Ubuntu Live 环境。系统主要从 U 盘加载，此时尚未开始安装；但 Live 系统仍能识别和挂载磁盘，因此不要主动执行分区或写盘操作。打开终端，用下面的命令确认启动模式：
+
+```bash
+test -d /sys/firmware/efi && echo UEFI || echo Legacy
+```
+
+在本节方案中应输出 `UEFI`；若不是，应返回启动菜单重新核对，而不是继续创建 EFI 分区。随后连接 Wi-Fi，检查网卡、触摸板和屏幕分辨率是否正常。关键硬件在 Live 环境中无法使用时，安装后的默认驱动也可能存在相同问题，可以先记录硬件型号并查询支持情况。
 
 建议在 Live 环境里先把 Wi-Fi 连上再开始安装。联网状态下，安装器可以顺带下载更新和第三方驱动，能省去装完之后的不少配置。确认无误后，双击桌面上的“Install Ubuntu 22.04.5 LTS”图标，正式开始安装。
 
@@ -208,7 +228,10 @@ GRUB_TIMEOUT=3
 
 ==== 选择：VMware Workstation Pro 还是 VirtualBox
 
-常见的桌面虚拟机软件包括 VMware Workstation Pro 和 VirtualBox。VMware Workstation Pro 由 Broadcom 旗下 VMware 提供，其授权政策在 2024 年后发生过调整，下载前应查看官网的当前许可条款。VirtualBox 由 Oracle 维护，核心软件采用开源许可；扩展包可能适用不同许可证，也需要按用途确认。
+常见的桌面虚拟机软件主要有两种：
+
+- *VMware Workstation Pro*：由 Broadcom 旗下 VMware 提供。其授权政策在 2024 年后发生过调整，下载前应查看官网的当前许可条款。
+- *VirtualBox*：由 Oracle 维护，核心软件采用开源许可。扩展包可能适用不同许可证，也需要按用途确认。
 
 两者都提供虚拟磁盘、快照和多种网络模式，但界面、硬件支持和具体行为并不完全相同。下文以 VMware 为例；使用 VirtualBox 时，应在其文档中找到对应设置。
 
@@ -272,7 +295,13 @@ wsl --list --verbose
 
 ==== 与 Windows 的文件互通
 
-WSL2 与 Windows 可以相互访问文件。在 Ubuntu 中，Windows 的 C 盘通常挂载到 `/mnt/c`，例如下载目录为 `/mnt/c/Users/你的用户名/Downloads`。在 Windows 资源管理器中，可以从侧栏的 Linux 项进入，也可以在地址栏输入 `\\wsl$` 查看 WSL 发行版中的文件。
+WSL2 与 Windows 可以相互访问文件。在 Ubuntu 中，Windows 的 C 盘通常挂载到 `/mnt/c`。例如，Windows 下载目录在 WSL 中通常对应：
+
+```text
+/mnt/c/Users/你的用户名/Downloads
+```
+
+反过来，在 Windows 资源管理器中可以从侧栏的 Linux 项进入，也可以在地址栏输入 `\\wsl$` 查看 WSL 发行版中的文件。
 
 跨 Windows 与 Linux 文件系统访问通常比在同一文件系统内读写慢，尤其会影响包含大量小文件的 C++ 编译和大型仓库的 `git status`。主要在 Linux 中构建的代码建议放在 Linux 家目录（`~`）下，并使用支持 WSL 的编辑器访问；`/mnt/c` 更适合交换文件。性能会随 WSL 与 Windows 版本变化，重要任务可用实际工程测量后再决定存放位置。
 
@@ -302,7 +331,13 @@ sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
 sudo sed -i 's@//.*archive.ubuntu.com@//mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list
 ```
 
-如果你想看得更明白，也可以不用 `sed`，直接用文本编辑器打开配置文件（`sudo nano /etc/apt/sources.list`），把内容整个替换为：
+如果你想看得更明白，也可以不用 `sed`，直接用文本编辑器打开配置文件：
+
+```bash
+sudo nano /etc/apt/sources.list
+```
+
+打开后，把内容整个替换为：
 
 ```text
 # Ubuntu 22.04 (jammy) 清华大学 TUNA 镜像源
@@ -424,14 +459,20 @@ gsettings set org.gnome.desktop.screensaver lock-enabled false
 
 ==== 安装 VS Code
 
-VS Code 官方提供 Ubuntu 的 `.deb` 安装包。用浏览器打开 `https://code.visualstudio.com`，下载 `.deb` 版本（64 bit）。先在终端列出下载目录中的候选文件：
+VS Code 官方提供 Ubuntu 的 `.deb` 安装包。用浏览器打开 #link("https://code.visualstudio.com")[VS Code 官网]，下载 `.deb` 版本（64 bit）。先在终端列出下载目录中的候选文件：
 
 ```bash
 cd ~/Downloads
 ls -lh -- code_*.deb
 ```
 
-确认列表中目标包的时间、架构和完整文件名后，输入 `sudo apt install ./code_`，再按 `Tab` 补全为那个文件名并执行。不要直接把 `./code_*.deb` 交给 `apt`：下载目录中保留多个版本时，通配符会展开成多个参数，可能同时尝试安装多个包。
+确认列表中目标包的时间、架构和完整文件名后，输入下面的命令前缀：
+
+```bash
+sudo apt install ./code_
+```
+
+先按 `Tab` 补全为刚才确认的完整文件名，再执行。不要直接使用 `./code_*.deb` 通配所有候选文件：下载目录中保留多个版本时，通配符会展开成多个参数，可能让 `apt` 同时尝试安装多个包。
 
 Ubuntu 软件商店提供 snap 版 VS Code，但它的沙箱机制可能影响中文输入法或部分文件访问场景。本书使用官方 `.deb` 包；安装后会注册 Microsoft 软件源，后续可随 `apt upgrade` 更新。不同发行渠道的行为会随版本变化，遇到问题时应先确认实际安装来源。
 
@@ -452,7 +493,13 @@ Ubuntu 软件商店提供 snap 版 VS Code，但它的沙箱机制可能影响�
 
 车载 NUC 通常装在机器人底盘内，不会长期连接显示器和键盘，但修改参数、查看日志和调试程序都要直接操作 NUC 上的文件与进程。将 NUC 接入调试网络后，笔记本可以通过 SSH 登录；VS Code 的 Remote-SSH 插件则在这一连接上提供文件浏览、代码编辑、终端和调试功能。界面仍显示在笔记本上，实际打开的文件和执行的命令都位于 NUC，因此不必为每次修改拆装显示器或来回复制代码。
 
-前提是目标机器已经按需安装 `openssh-server`，并且网络可达。第一次连接前，先在 NUC 本机或由可信管理员取得 SSH 主机密钥指纹；例如，NUC 上可以执行 `sudo ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub` 查看 Ed25519 主机密钥指纹。假设 NUC 的 IP 是 `192.168.1.100`、用户名是 `rm`，再从笔记本验证 SSH 连接：
+前提是目标机器已经按需安装 `openssh-server`，并且网络可达。第一次连接前，先在 NUC 本机或由可信管理员取得 SSH 主机密钥指纹。例如，可以在 NUC 上执行：
+
+```bash
+sudo ssh-keygen -l -f /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+这条命令显示 Ed25519 主机密钥指纹。假设 NUC 的 IP 是 `192.168.1.100`、用户名是 `rm`，再从笔记本验证 SSH 连接：
 
 ```bash
 ssh rm@192.168.1.100
