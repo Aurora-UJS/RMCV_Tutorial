@@ -194,11 +194,13 @@ while (running) {
         continue;
     }
     fail_count = 0;
-    const auto received_at = std::chrono::steady_clock::now(); // 应用取得缓冲的时刻，不是曝光时刻
+    // 应用取得缓冲的时刻，不是曝光时刻。
+    const auto received_at = std::chrono::steady_clock::now();
     // 以下包装假定已回读为紧密排列的 BayerRG8；其他格式须按 SDK 描述转换。
     cv::Mat bayer(raw.stFrameInfo.nHeight, raw.stFrameInfo.nWidth, CV_8UC1, raw.pBufAddr);
     cv::Mat bgr;
-    cv::cvtColor(bayer, bgr, cv::COLOR_BayerBG2BGR); // 假设输入是左上角为 R 的 RGGB
+    // 假设输入是左上角为 R 的 RGGB。
+    cv::cvtColor(bayer, bgr, cv::COLOR_BayerBG2BGR);
     check(MV_CC_FreeImageBuffer(handle, &raw), "release frame buffer");
     queue.push({std::move(bgr), received_at});
 }
@@ -210,7 +212,14 @@ MV_CC_DestroyHandle(handle);
 
 排障时先核对四项：实际像素格式与每行占用的字节数（行步长）是否符合包装假设，BGR/RGB 顺序是否匹配，是否在开始采集后才取帧，以及触发模式是否与实际接线一致。示例中的 `select_by_serial`、错误分类和故障上报是项目辅助函数，不是厂商 API；实现时须把当前 SDK 的错误码映射到“等待触发、可恢复流错误、不可恢复错误”等类别。外触发模式下没有触发沿时，取帧超时可能是预期行为，不应计入掉线阈值。
 
-`GetImageBuffer` 成功后，`bayer` 只是借用 SDK 内存的 `cv::Mat` 头，必须在 `FreeImageBuffer` 之前完成读取；`cvtColor` 写出的 `bgr` 拥有独立内存，因此示例先归还 SDK 缓冲，再把 `bgr` 移入队列，无需额外 `clone`。若直接把原始帧交给消费者或尝试零拷贝，就不能在消费者结束前归还缓冲。生产代码还应使用作用域守卫，确保格式检查、转换或其他操作抛异常时也能归还缓冲；设备句柄与 SDK 全局状态同样宜由 RAII（随作用域自动清理）对象管理。失败分支必须 `continue` 或退出，不能继续包装帧。示例中的 `MV_FRAME_OUT raw{}` 会把指针初始化为空，而不是“野指针”；若把结构体放在循环外且不清零，才可能误用上一次成功留下的地址。所有配置调用也应检查返回值并回读关键参数，避免节点名不支持时静默沿用默认值。
+`GetImageBuffer` 成功返回以后，先分清两块内存的所有权：
+
+- `bayer` 只是借用 SDK 内存的 `cv::Mat` 头，必须在调用 `FreeImageBuffer` 前读完。
+- `cvtColor` 写出的 `bgr` 拥有独立内存。
+
+因此，示例先归还 SDK 缓冲，再把 `bgr` 移入队列，无需额外 `clone`。若直接把原始帧交给消费者或尝试零拷贝，就不能在消费者结束前归还缓冲。
+
+生产代码还应使用作用域守卫，确保格式检查、转换或其他操作抛异常时也能归还缓冲；设备句柄与 SDK 全局状态同样宜由 RAII（随作用域自动清理）对象管理。失败分支必须 `continue` 或退出，不能继续包装帧。示例中的 `MV_FRAME_OUT raw{}` 会把指针初始化为空，而不是“野指针”；若把结构体放在循环外且不清零，才可能误用上一次成功留下的地址。所有配置调用也应检查返回值并回读关键参数，避免节点名不支持时静默沿用默认值。
 
 #figure(
   image("images/app-camera-grab-pipeline.png", width: 100%),
@@ -231,7 +240,13 @@ MV_CC_DestroyHandle(handle);
 
 在 *ROS 2 节点式*方案中，相机组件可通过 `image_transport` 发布图像，并用参数系统管理曝光、增益等配置。只有驱动实现参数回调和合法性检查后，这些参数才能安全地运行时更新。节点组合（composition）允许相机与识别组件位于同一进程；若消息类型、发布订阅方式和所用 ROS 2 版本满足进程内通信条件，可以避免中间件序列化并减少拷贝，但“组合”本身不保证零拷贝。从厂商 SDK 缓冲去马赛克到 `cv::Mat`，再填入 `sensor_msgs::msg::Image`，通常仍有各自的内存所有权边界。若要继续减少拷贝，需要核对类型适配、借用消息、ROS 中间件（RMW）实现和订阅者是否共同支持，并保证 SDK 缓冲在最后一个使用者结束前不被归还。ROS 2 的录包、可视化和生命周期工具则便于联调与状态管理。
 
-在*独立进程*方案中，可以用抽象基类统一接口，例如 `CameraBase::read(cv::Mat&, timestamp&)`，再由工厂根据配置选择具体厂商实现。进程内需自行实现线程、队列、参数更新、监控和退出顺序；好处是依赖较少，进程故障边界也更清楚。掉线恢复的能力取决于驱动实现，与是否使用 ROS 2 没有必然关系。
+在*独立进程*方案中，可以用抽象基类统一接口。例如，可以约定：
+
+```text
+CameraBase::read(cv::Mat&, timestamp&)
+```
+
+再由工厂根据配置选择具体厂商实现。进程内需自行实现线程、队列、参数更新、监控和退出顺序；好处是依赖较少，进程故障边界也更清楚。掉线恢复的能力取决于驱动实现，与是否使用 ROS 2 没有必然关系。
 
 对于允许丢帧、目标是降低在线控制延迟的识别链，可以使用容量为 1 的覆盖式队列：生产者写入新帧时替换尚未处理的旧帧，消费者每次取得当时最新的帧。这样不会因推理较慢而让排队延迟持续增长，同时要统计覆盖次数和帧龄，便于发现算力不足。队列中的图像必须拥有像素内存，或持有能延长 SDK 缓冲生命周期的对象；只传递指向已归还缓冲的 `cv::Mat` 头会产生悬空引用。该策略不适用于必须逐帧处理的录制、标定或某些时序算法；这些任务应使用独立队列或降低输入帧率，而不是静默丢帧。
 

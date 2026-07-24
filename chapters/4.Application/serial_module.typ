@@ -62,9 +62,21 @@ void RMSerialDriver::receiveData() {
 
 基础篇的状态机逐字节处理输入，可以在任意边界重新寻找帧头。这里利用固定帧长简化为“先读到 `0x5A`，再请求剩余字节”。若流已经错位，而载荷中恰好出现 `0x5A`，该字节可能被误当成帧头；CRC 会过滤绝大多数错误组合，但恢复时间仍取决于后续字节内容。更明确的实现可以维护持久接收缓冲区，逐字节滑动寻找候选帧，并在 CRC 失败后只丢弃必要字节。
 
-这里还有一个可以直接从依赖源码确认的问题。ROS 2 Humble 的 `transport_drivers` 1.2.0 中，`SerialPort::receive()` 返回 `read_some()` 实际读到的字节数；它不保证填满传入的 `vector`。参考实现忽略这个返回值，仍按完整 `ReceivePacket` 解码。发生短读时，缓冲区未覆盖部分可能保留旧数据，CRC 通常会失败，也存在错误组合偶然通过校验的可能。正确做法是循环累计返回长度，直到收满 `sizeof(ReceivePacket)-1`，或改用能保证读取指定长度的组合操作；测试时还应主动把一帧拆成多个写入，不能只发送整帧验证。
+这里还有一个可以直接从依赖源码确认的问题。ROS 2 Humble 的 `transport_drivers` 1.2.0 中，接收调用关系是：
 
-发送方向存在对称问题：`SerialPort::send()` 调用 `write_some()` 并返回实际写出长度，`sendData()` 同样忽略了这个返回值。数据包只有 48 B 并不构成“每次一定完整写出”的接口保证；部分写入会让下位机收到截断帧。发送端也应循环推进尚未写出的区间，或使用会持续执行到缓冲区写完（或报错）的 `asio::write`，并在可控制返回长度的模拟 I/O 层主动制造部分写入。
+```text
+SerialPort::receive() -> read_some()
+```
+
+后者返回实际读到的字节数，不保证填满传入的 `vector`。参考实现忽略这个返回值，仍按完整 `ReceivePacket` 解码。发生短读时，缓冲区未覆盖部分可能保留旧数据，CRC 通常会失败，也存在错误组合偶然通过校验的可能。正确做法是循环累计返回长度，直到收满 `sizeof(ReceivePacket)-1`，或改用能保证读取指定长度的组合操作；测试时还应主动把一帧拆成多个写入，不能只发送整帧验证。
+
+发送方向存在对称问题，调用关系是：
+
+```text
+SerialPort::send() -> write_some()
+```
+
+该接口返回实际写出长度，而 `sendData()` 忽略了返回值。数据包只有 48 B 并不构成“每次一定完整写出”的接口保证；部分写入会让下位机收到截断帧。发送端也应循环推进尚未写出的区间，或使用会持续执行到缓冲区写完（或报错）的 `asio::write`，并在可控制返回长度的模拟 I/O 层主动制造部分写入。
 
 ==== 双包序列化：直接传输对象表示的条件
 
@@ -145,7 +157,13 @@ if (!initial_set_param_ || packet.detect_color != previous_receive_color_) {
 if (packet.reset_tracker) resetTracker();          // 位为 1 的每一帧都会请求复位
 ```
 
-这段代码还有三个边界。第一，`setParam()` 可能因参数服务未就绪而返回，因旧请求仍在进行而跳过新请求，异步请求也可能稍后失败；调用者却会立即更新 `previous_receive_color_`。只要首次设置曾经成功，一次未真正应用的颜色变化就可能被当成“已经处理”，下一帧不再重试。应分别维护期望值与已确认值，只在成功响应后推进已确认值。第二，`initial_set_param_` 是普通 `bool`：接收线程读取它，异步参数响应回调写它。当响应由 executor 与接收线程并发处理时，源码没有使用原子变量或互斥，便会产生 C++ 数据竞争；可以用原子变量或互斥保护，也可以把状态判断和响应更新放到同一个执行上下文。第三，`reset_tracker` 是电平触发，不是边沿触发：只要该位连续为 1，每个合法接收包都会尝试调用 `/tracker/reset`；服务暂时不可用时则直接跳过。协议双方应明确该位是单帧脉冲还是保持状态，并对重复调用和失败重试作出约定。
+#block(breakable: false)[
+这段代码有三个需要分开处理的边界：
+
+- *参数更新确认*：`setParam()` 可能因参数服务未就绪而返回，因旧请求仍在进行而跳过新请求，异步请求也可能稍后失败；调用者却会立即更新 `previous_receive_color_`。只要首次设置曾经成功，一次未真正应用的颜色变化就可能被当成“已经处理”，下一帧不再重试。应分别维护期望值与已确认值，只在成功响应后推进已确认值。
+- *并发状态*：`initial_set_param_` 是普通 `bool`：接收线程读取它，异步参数响应回调写它。当响应由 executor 与接收线程并发处理时，源码没有使用原子变量或互斥，便会产生 C++ 数据竞争；可以用原子变量或互斥保护，也可以把状态判断和响应更新放到同一个执行上下文。
+- *复位触发语义*：`reset_tracker` 是电平触发，不是边沿触发：只要该位连续为 1，每个合法接收包都会尝试调用 `/tracker/reset`；服务暂时不可用时则直接跳过。协议双方应明确该位是单帧脉冲还是保持状态，并对重复调用和失败重试作出约定。
+]
 
 === 断线恢复及其边界
 
@@ -195,7 +213,7 @@ static_assert(sizeof(VisionToGimbal) <= 64);       // 只限制本地 ABI 下的
 
 #figure(
   image("images/app-serial-udev-chain.png", width: 100%),
-  caption: [udev 匹配链与符号链接生成过程（脚本 `app_serial_udev_chain.py`）。`ttyUSB0` 是 `SUBSYSTEM=="tty"` 的叶子设备，而 `idVendor`、`idProduct` 通常位于 USB 祖先设备；本节示例因此使用 `ATTRS{}` 沿父链匹配。内核发出设备事件后，`systemd-udevd` 按规则创建 `/dev/rm_serial`。若同一条规则同时匹配多个设备，别名仍可能冲突，需要加入可区分个体或物理位置的条件，例如序列号或物理端口。],
+  caption: [udev 匹配链与符号链接生成过程。`ttyUSB0` 是 `SUBSYSTEM=="tty"` 的叶子设备，厂商字段 idVendor 和产品字段 idProduct 通常位于 USB 祖先设备；本节示例因此使用 `ATTRS{}` 沿父链匹配。内核发出设备事件后，systemd-udevd 按规则创建 `/dev/rm_serial`。若同一条规则同时匹配多个设备，别名仍可能冲突，需要加入可区分个体或物理位置的条件，例如序列号或物理端口。配套脚本见 `app_serial_udev_chain.py`。],
 )
 
 ==== 名字为什么会跳
@@ -219,7 +237,13 @@ $ lsusb
 Bus 001 Device 007: ID 1a86:7523 QinHeng Electronics CH340 serial converter
 ```
 
-这里的 `1a86:7523` 是该示例 CH340 的 `idVendor:idProduct`。FT232 常见 `0403:6001`，CP210x 常见 `10c4:ea60`，部分 STM32 CDC 固件使用 `0483:5740`；这些数字只标识示例型号，实际规则必须读取目标设备。更完整的属性可用 `udevadm` 沿设备链查看：
+这里的 `1a86:7523` 是该示例 CH340 的 `idVendor:idProduct`。其他常见示例值如下：
+
+- FT232：`0403:6001`
+- CP210x：`10c4:ea60`
+- 部分 STM32 CDC 固件：`0483:5740`
+
+这些数字只标识示例型号，实际规则必须读取目标设备。更完整的属性可用 `udevadm` 沿设备链查看：
 
 ```bash
 # 沿父子链上溯，逐层打印可用的匹配属性
@@ -228,11 +252,26 @@ udevadm info --attribute-walk --name=/dev/ttyUSB0
 udevadm info --query=property --name=/dev/ttyUSB0   # ID_VENDOR_ID / ID_MODEL_ID / ID_SERIAL
 ```
 
-`--attribute-walk` 先列设备自身，再逐层列出父设备。对常见 USB 串口，`SUBSYSTEM=="tty"` 位于叶子，`idVendor`、`idProduct` 和可能存在的 `serial` 则位于某个 USB 祖先。规则中的 `ATTR{}` 只看当前设备，`ATTRS{}` 会在父链中寻找匹配属性；也可以使用 `ENV{ID_VENDOR_ID}` 等已经导出的 udev 属性，但必须用 `udevadm info` 确认本机实际提供了什么。
+前面的属性遍历命令先列设备自身，再逐层列出父设备。对常见 USB 串口，属性分布通常是：
+
+```text
+叶子设备：SUBSYSTEM=="tty"
+USB 祖先：idVendor, idProduct, 可能存在的 serial
+```
+
+规则中的 `ATTR{}` 只看当前设备，`ATTRS{}` 会在父链中寻找匹配属性。也可以使用已经导出的 udev 属性，例如 `ENV{ID_VENDOR_ID}`；但必须用前面的查询命令确认本机实际提供了什么。
 
 ==== 按父链属性写规则：使用 ATTRS
 
-本机自定义规则通常放在 `/etc/udev/rules.d/`，文件按名称的词典序处理，因此常用数字前缀控制相对顺序，例如 `99-rm-serial.rules`。下面的示例按 VID/PID 匹配一个 CH340，并创建 `/dev/rm_serial`：
+本机自定义规则涉及的三个路径如下：
+
+```text
+规则目录  /etc/udev/rules.d/
+示例文件  99-rm-serial.rules
+目标链接  /dev/rm_serial
+```
+
+规则文件按名称的词典序处理，因此常用数字前缀控制相对顺序。下面的示例按 VID/PID 匹配一个 CH340，并创建上述目标链接：
 
 ```text
 # /etc/udev/rules.d/99-rm-serial.rules
@@ -251,9 +290,41 @@ $ udevadm verify /etc/udev/rules.d/99-rm-serial.rules
   Fail:    0
 ```
 
-  如果故意把第一项误写为 `SUBSYSTEM="tty"`，同一工具会报告 `Invalid operator for SUBSYSTEM` 并以失败状态退出。这样才能确认验证器确实检查到了运算符，而不是把“命令没有输出”误当成通过。不同 systemd 版本的输出格式可能不同；Ubuntu 22.04 所用的较旧 systemd 还可能没有 `udevadm verify`，此时使用下一节的 `udevadm test` 检查解析和匹配过程。
-- `ATTRS{idVendor}=="1a86"`、`ATTRS{idProduct}=="7523"`：在本例中，这两个属性位于同一个 USB 祖先，因此使用 `ATTRS`。同一条规则中的多个 `ATTRS` 条件必须能在同一个父设备上同时成立；若属性分属不同层，应改用导出的 `ENV{}` 属性或拆分匹配思路，而不是盲目叠加条件。
-- `MODE="0660"`、`GROUP="dialout"`：让所有者和指定组可读写。组名与权限策略随发行版和设备规则变化，先用 `ls -l`、`getent group dialout` 和队内安全策略确认；不要为了方便长期用 `sudo` 启动整套视觉程序。
+  如果故意把第一项误写为：
+
+  ```text
+  SUBSYSTEM="tty"
+  ```
+
+  同一工具会报告：
+
+  ```text
+  Invalid operator for SUBSYSTEM
+  ```
+
+  工具随后以失败状态退出。这样才能确认验证器确实检查到了运算符，而不是把“命令没有输出”误当成通过。不同 systemd 版本的输出格式可能不同；Ubuntu 22.04 所用的较旧 systemd 还可能没有 `udevadm verify`，此时使用下一节的 `udevadm test` 检查解析和匹配过程。
+- 厂商和产品条件：
+
+  ```text
+  ATTRS{idVendor}=="1a86"
+  ATTRS{idProduct}=="7523"
+  ```
+
+  在本例中，这两个属性位于同一个 USB 祖先，因此使用 `ATTRS`。同一条规则中的多个 `ATTRS` 条件必须能在同一个父设备上同时成立；若属性分属不同层，应改用导出的 `ENV{}` 属性或拆分匹配思路，而不是盲目叠加条件。
+- 权限设置：
+
+  ```text
+  MODE="0660"
+  GROUP="dialout"
+  ```
+
+  这两项让所有者和指定组可读写。组名与权限策略随发行版和设备规则变化，先用 `ls -l` 检查目标节点，再运行：
+
+  ```bash
+  getent group dialout
+  ```
+
+  还要结合队内安全策略确认；不要为了方便长期用 `sudo` 启动整套视觉程序。
 - `SYMLINK+="rm_serial"`：追加一个符号链接。`+=` 保留此前规则已经加入的其他链接；`=` 会重置当前规则处理过程中累积的 `SYMLINK` 值，但不会把内核设备节点 `/dev/ttyUSB0` 本身改名或删除。
 
 行尾的 `\` 是续行，规则太长时可以折行。
