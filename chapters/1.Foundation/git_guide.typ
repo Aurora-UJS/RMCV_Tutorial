@@ -135,7 +135,13 @@ git diff --staged
 
 ==== `add` 与 `commit`：提交的是“意图”而不是“时间点”
 
-初学者常见的问题是：代码刚能运行就执行 `git add . && git commit -m "update"`。这样容易把不相关改动放进同一个提交，也无法从提交信息判断修改目的。
+初学者常见的问题是，代码刚能运行就直接执行：
+
+```bash
+git add . && git commit -m "update"
+```
+
+这样容易把不相关改动放进同一个提交，也无法从提交信息判断修改目的。
 
 更好的流程是：
 
@@ -157,7 +163,11 @@ git commit -m "fix(tracker): guard against empty candidate set"
 - `test`: 测试
 - `chore`: 杂项维护
 
-示例：`feat(protocol): add crc16 verification for serial frames`
+例如，一次为串口帧增加 CRC16 校验的提交可以写成：
+
+```text
+feat(protocol): add crc16 verification for serial frames
+```
 
 ==== 撤销改动：先搞清你要撤销哪一层
 
@@ -169,7 +179,13 @@ Git 的“撤销”命令多，是因为它们作用层不同。
 git restore src/detector.cpp
 ```
 
-这条命令会丢弃该文件尚未提交的工作区修改。执行前先用 `git diff -- src/detector.cpp` 确认内容；仍有保留价值时，应先提交到临时分支或另存补丁。
+这条命令会丢弃该文件尚未提交的工作区修改。执行前先查看差异：
+
+```bash
+git diff -- src/detector.cpp
+```
+
+确认内容仍有保留价值时，应先提交到临时分支或另存补丁。
 
 撤销暂存（保留工作区修改）：
 
@@ -296,7 +312,9 @@ git merge --ff-only upstream/main
 git push origin main
 ```
 
-这组命令假设个人 fork 的 `main` 没有独有提交：`--ff-only` 只允许把它快进到 `upstream/main`，一旦历史已经分叉就停止并要求人工判断。同步完成后，再从更新后的 `main` 创建功能分支，或按团队约定把已有功能分支 rebase/merge 到新基线；上面的命令本身并没有更新其他功能分支。
+这组命令有一个重要前提：个人 fork 的 `main` 没有独有提交。命令中的 `--ff-only` 只允许把本地主线快进到 `upstream/main`；一旦历史已经分叉，Git 就会停止并要求人工判断。
+
+同步完成后，再从更新后的 `main` 创建功能分支，或按团队约定把已有功能分支 rebase/merge 到新基线。上面的命令本身并没有更新其他功能分支。
 
 ==== 协作中三个常见问题
 
