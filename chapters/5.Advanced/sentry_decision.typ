@@ -35,12 +35,20 @@
 
 哨兵的云台和底盘通常独立转动。云台偏航角由搜索或跟踪任务决定，底盘朝向则由导航和反自瞄策略决定。Nav2 中的 `robot_base_frame` 用来描述机器人本体，控制链也必须明确 `cmd_vel` 的表达坐标系。许多通用导航配置默认这个坐标系固定在车体上；如果把它改成快速转动的云台系，却没有同步修改控制链的坐标约定，速度指令就可能被错误解释。
 
-前述导航栈把重定位与点云处理节点的 `robot_base_frame` 配成云台偏航系 `gimbal_yaw`。这不是由激光雷达安装位置直接决定的：mid360 安装在底盘上，里程计先给出 `odom → base_footprint`，点云处理节点再发布以 `gimbal_yaw` 为 child 的 odometry。速度出口还会叠加 $3.14$ rad/s 的固定底盘自旋。把这些代码连起来看，才能知道该项目为云台系配套设计了速度变换；单独抄一个 `robot_base_frame` 参数并不能得到同样行为。
+前述导航栈把重定位与点云处理节点配置成下面的关系：
+
+`robot_base_frame = gimbal_yaw`
+
+这不是由激光雷达安装位置直接决定的：mid360 安装在底盘上，里程计先给出 `odom → base_footprint`，点云处理节点再发布以 `gimbal_yaw` 为 child 的 odometry。速度出口还会叠加 $3.14$ rad/s 的固定底盘自旋。把这些代码连起来看，才能知道该项目为云台系配套设计了速度变换；单独抄一个 `robot_base_frame` 参数并不能得到同样行为。
 
 继续推导前，需要先区分两个同名的 `odom`：
 
 #note("同名不同义：`odom` 在自瞄栈和导航栈里不是一个东西")[
-自瞄栈中，串口节点接收下位机欧拉角后广播 `odom → gimbal_link`。`rm_serial_driver.cpp` 只设置旋转，平移保持为零。因此，这里的 `odom` 用于表达云台姿态参考：它没有底盘在场地中的平移信息，偏航零点也取决于系统建立参考姿态的方式。「项目分析」篇的「rm_vision」一章还会从框架角度说明这条变换。
+自瞄栈中，串口节点接收下位机欧拉角后广播这条变换：
+
+`odom → gimbal_link`
+
+`rm_serial_driver.cpp` 只设置旋转，平移保持为零。因此，这里的 `odom` 用于表达云台姿态参考：它没有底盘在场地中的平移信息，偏航零点也取决于系统建立参考姿态的方式。「项目分析」篇的「rm_vision」一章还会从框架角度说明这条变换。
 
 导航栈中的 `odom` 则来自 LIO（激光惯性里程计），包含连续的平移与旋转，但会随时间漂移；重定位模块再估计 `map` 与 `odom` 之间的变换。它用于回答底盘相对于局部或全局地图的位置。
 
@@ -64,7 +72,13 @@ $ hat(bold(d))_"actual" = bold(R)(chi(t) - psi(t)) hat(bold(d)) $
   caption: [坐标系误配的简化仿真（脚本 `adv_sentry_spinnav.py`，非实测）：控制周期 50 ms、速度 1.5 m/s、云台偏航速率 2 rad/s，每周期重新指向目标，并假设底盘执行系偏航 $chi=0$。左图比较期望直线、坐标一致轨迹和误把云台系指令当作底盘系执行的轨迹；右图给出到目标的距离。以 5 cm 为到点阈值时，一致模型约 3.3 s 进入阈值，误配模型在 6 s 内最近仍距目标约 4.2 m。这些结果只对应上述二维几何假设。],
 )
 
-在 `pb2025_sentry_nav` 的 `fake_vel_transform/src/fake_vel_transform.cpp` 中，`fake_vel_transform` 包会建立虚拟坐标系 `gimbal_yaw_fake`：它与真实 `gimbal_yaw` 原点重合，但用反向旋转抵消当前偏航，使规划侧看到的 yaw 保持固定。节点发布的核心变换如下：
+在 `pb2025_sentry_nav` 中，相关实现位于：
+
+```text
+fake_vel_transform/src/fake_vel_transform.cpp
+```
+
+`fake_vel_transform` 包会建立虚拟坐标系 `gimbal_yaw_fake`：它与真实 `gimbal_yaw` 原点重合，但用反向旋转抵消当前偏航，使规划侧看到的 yaw 保持固定。节点发布的核心变换如下：
 
 ```cpp
 // 发布 robot_base_frame → fake_robot_base_frame：只有一个绕 z 的反向旋转
@@ -113,7 +127,17 @@ sync_ = std::make_unique<message_filters::Synchronizer<SyncPolicy>>(
 
 ==== 五种坐标处理思路
 
-这里把三种能直接定位到源码的做法和两种设计对照放在一起。前三种分别来自 `pb2025_sentry_nav/fake_vel_transform/src/fake_vel_transform.cpp`，以及 `SCURM_SentryNavigation` 的 `cmd_chassis/src/fake_joint.cpp` 和 `cmd_chassis/src/twist_transformer.cpp`；后两种用来补齐设计空间，不对应本章已经核对的具体仓库。无论选哪一种，都不能只对旋转公式，还要看 $psi$ 从哪里来、对应什么时间，以及执行端怎样解释速度消息。
+这里把三种能直接定位到源码的做法和两种设计对照放在一起。前三种的来源如下：
+
+```text
+pb2025_sentry_nav:
+  fake_vel_transform/src/fake_vel_transform.cpp
+SCURM_SentryNavigation:
+  cmd_chassis/src/fake_joint.cpp
+  cmd_chassis/src/twist_transformer.cpp
+```
+
+后两种用来补齐设计空间，不对应本章已经核对的具体仓库。无论选哪一种，都不能只对旋转公式，还要看 $psi$ 从哪里来、对应什么时间，以及执行端怎样解释速度消息。
 
 #figure(
 table(
@@ -177,7 +201,14 @@ $ delta = 3 times 0.05 = 0.15 "rad" approx 8.6 degree $
 
 ==== 仿真与实车的限幅差异
 
-SCNU-RM-Sentry 的 `src/rm_bringup/config/nav2_params_sim.yaml` 和 `src/rm_bringup/config/nav2_params_real.yaml` 分别给出仿真与实车 Nav2 参数，两者最明显的差异集中在速度与加速度限幅：
+SCNU-RM-Sentry 的仿真与实车 Nav2 参数分别位于：
+
+```text
+仿真  src/rm_bringup/config/nav2_params_sim.yaml
+实车  src/rm_bringup/config/nav2_params_real.yaml
+```
+
+两份配置最明显的差异集中在速度与加速度限幅：
 
 #figure(
 table(
@@ -297,11 +328,23 @@ caption: [公开仓库中可见的决策载体。选型时可重点比较修改�
 
 相较于集中在一个大函数中的分支，XML 行为树可以把策略结构与节点实现分开，也便于用图形工具检查执行路径。它并不会自动提高正确性：动作和条件仍需实现、注册和测试，黑板键、抢占、节点停止与复位、超时语义都会增加新的接口。
 
-BehaviorTree.CPP v4 的 `ScriptCondition` 是上游提供的标准节点，定义在 `include/behaviortree_cpp/actions/script_condition.h`。因此，在 XML 属性中写条件表达式不表示项目修改了行为树库；是否存在分叉仍要比较实际依赖源码和版本。
+BehaviorTree.CPP v4 的 `ScriptCondition` 是上游提供的标准节点，定义在以下头文件：
+
+```text
+include/behaviortree_cpp/actions/script_condition.h
+```
+
+因此，在 XML 属性中写条件表达式不表示项目修改了行为树库；是否存在分叉仍要比较实际依赖源码和版本。
 
 ==== 一个十五行的主树
 
-SMBU 北极熊战队公开的哨兵行为树包 `pb2025_sentry_behavior`（Apache-2.0）中，`behavior_trees/rmul_2025.xml` 的 RMUL 主树只有十五行：
+SMBU 北极熊战队公开的哨兵行为树包 `pb2025_sentry_behavior`（Apache-2.0）中，RMUL 主树位于：
+
+```text
+behavior_trees/rmul_2025.xml
+```
+
+这棵主树只有十五行：
 
 ```xml
   <BehaviorTree ID="rmul_2025">
@@ -381,7 +424,18 @@ rm_decision_cpp/src/behaviors/is_in_position.cpp
 
 将策略结构移到 XML 后，修改判据不必重新编译主程序，但部分错误也从编译期移到了加载期或运行期。前述仓库中就有两个很适合做配置校验测试的例子。
 
-第一，`rm_decision_cpp/behavior_tree/24trees/` 下的 `RMUC_red.xml`、`RMUC_red2.xml`、`RMUC_blue.xml`、`RMUC_blue2.xml` 和 `RMUL.xml` 都把 17 mm 弹丸余量写入拼成 `sllowance` 的黑板键，这些 XML 中没有节点读取它。BehaviorTree.CPP 允许写入无人读取的键，因此运行时不一定主动报错。2025 树改正了键名，弹量也进入补给判据；这能说明文件版本发生了变化，却不足以还原 2024 赛季实际部署时是否另有读取路径。
+第一，以下目录中的五个 XML 文件都有同一个问题：
+
+```text
+rm_decision_cpp/behavior_tree/24trees/
+  RMUC_red.xml
+  RMUC_red2.xml
+  RMUC_blue.xml
+  RMUC_blue2.xml
+  RMUL.xml
+```
+
+它们都把 17 mm 弹丸余量写入拼成 `sllowance` 的黑板键，而这些 XML 中没有节点读取它。BehaviorTree.CPP 允许写入无人读取的键，因此运行时不一定主动报错。2025 树改正了键名，弹量也进入补给判据；这能说明文件版本发生了变化，却不足以还原 2024 赛季实际部署时是否另有读取路径。
 
 #block(breakable: false)[
 第二个问题出在 `25UCred.xml`：一个导航目标把坐标分量写成了 `-5.6.0`。解析链经过两个文件：
@@ -400,7 +454,13 @@ BehaviorTree.CPP/src/basic_types.cpp
 
 ==== 仓库内置 BehaviorTree.CPP 的版本差异
 
-同一仓库将 BehaviorTree.CPP 4.5.1 的依赖源码直接放入工作空间（常称为 vendor）。与上游同版本比较后，`BehaviorTree.CPP/src/controls/reactive_fallback.cpp` 中的静态开关初值不同：
+同一仓库将 BehaviorTree.CPP 4.5.1 的依赖源码直接放入工作空间（常称为 vendor）。与上游同版本比较后，差异位于：
+
+```text
+BehaviorTree.CPP/src/controls/reactive_fallback.cpp
+```
+
+该文件中的静态开关初值不同：
 
 ```text
 仓库内置版本：            ReactiveFallback::throw_if_multiple_running = false
@@ -497,7 +557,13 @@ caption: [三种姿态模式默认效果的规则推导（2026 手册，非实�
 
 下文的 URDF 数值取自采用 Apache-2.0 的 `rm_gimbal_description`；队伍新增的仲裁包没有明确许可证，因此只描述它的运行逻辑，不摘录源码。
 
-*坐标系结构。* URDF 在底盘 `odom` 下连接“大云台” `gimbal`，再向左右分出 `odom_link_first` 和 `odom_link_second` 两套小云台底座；横向偏移为 $plus.minus 0.123$ m，纵向偏移为 $-0.140$ m。每个分支继续连接小云台、相机和光学坐标系。它沿用单云台 TF 链，只是增加两条平行分支。另一支队伍的固件则分为主控、左云台和右云台三个 STM32 工程，说明双云台也可以按控制板拆分；这两个项目只是在展示不同组织方式，不能拼成同一台车的完整结构。
+*坐标系结构。* URDF 从底盘到两套小云台底座的关系是：
+
+- `odom` → `gimbal`
+- `gimbal` → `odom_link_first`
+- `gimbal` → `odom_link_second`
+
+后两条分支的横向偏移为 $plus.minus 0.123$ m，纵向偏移为 $-0.140$ m。每个分支继续连接小云台、相机和光学坐标系。这套结构沿用单云台 TF 链，只是增加两条平行分支。另一支队伍的固件则分为主控、左云台和右云台三个 STM32 工程，说明双云台也可以按控制板拆分；这两个项目只是在展示不同组织方式，不能拼成同一台车的完整结构。
 
 *两路目标仲裁。* 两台相机分别运行检测并发布装甲板，仲裁节点选择一路转发给单一跟踪器。所观察到的逻辑使用计数器维持互斥：先检测到目标的一路获得使用权并将计数器置为 80；计数器有效期间，另一路不向下游发布；当前一路连续丢失目标、计数器归零后，另一路才可切入。
 
