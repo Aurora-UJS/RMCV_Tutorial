@@ -46,6 +46,8 @@
 #include "chapters/5.Advanced/index.typ"
 = 项目分析
 #include "chapters/6.Projects/index.typ"
+= 工程协作篇
+#include "chapters/7.Collaboration/index.typ"
 
 
 /*
